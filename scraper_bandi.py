@@ -11,20 +11,12 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-<<<<<<< HEAD
-import os
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "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")  
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  
 GMAIL_USER = os.environ.get("GMAIL_USER", "marcotullio.valiante@gmail.com")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "gedk gkdb nxvx liqo")
 EMAIL_DESTINATARIO = os.environ.get("EMAIL_DESTINATARIO", "marcotullio.valiante@gmail.com")
-=======
-ANTHROPIC_API_KEY = "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"
-GMAIL_USER = "marcotullio.valiante@gmail.com"
-GMAIL_APP_PASSWORD = "gedk gkdb nxvx liqo"
-EMAIL_DESTINATARIO = "marcotullio.valiante@gmail.com"
 FILE_BANDI_VISTI = "bandi_visti.json"
->>>>>>> f857a279cf521b82aaadfe47a080a7304daf5281
 
 def analizza_bando_con_claude(titolo, fonte, scadenza):
     try:
