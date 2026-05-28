@@ -7,6 +7,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import anthropic
 import json
 import re
+import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
