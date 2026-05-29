@@ -95,6 +95,7 @@ def scrapa_invitalia():
                 bandi.append({
                     "Titolo": titolo_corrente,
                     "Scadenza": chiusura if chiusura else "Non specificata",
+                    "Data pubblicazione": "Non specificata",
                     "Link": "https://www.invitalia.it/cosa-facciamo/rafforziamo-le-imprese",
                     "Fonte": "Invitalia"
                 })
@@ -124,6 +125,7 @@ def scrapa_regione_campania():
                         bandi.append({
                             "Titolo": titolo,
                             "Scadenza": scadenza,
+                            "Data pubblicazione": "Non specificata",
                             "Link": link,
                             "Fonte": "Regione Campania - Agricoltura"
                         })
@@ -131,7 +133,7 @@ def scrapa_regione_campania():
     except Exception as e:
         print(f"  ⚠️ Errore Regione Campania: {e}")
         return []
-
+    
 def scrapa_gal_cilento():
     try:
         url = "https://www.galcilento.it/bandi/"
@@ -152,6 +154,7 @@ def scrapa_gal_cilento():
                 bandi.append({
                     "Titolo": titolo,
                     "Scadenza": chiusura if chiusura else "Non specificata",
+                    "Data pubblicazione": "Non specificata",
                     "Link": link,
                     "Fonte": "GAL Cilento"
                 })
@@ -181,9 +184,15 @@ def scrapa_bandi_ue():
             identificatore = b.get("identifier", "")
             link = f"https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/{identificatore}"
             programma = b.get("frameworkProgramme", {}).get("abbreviation", "UE")
+            pub_date_ts = b.get("publicationDateLong", None)
+            if pub_date_ts:
+                data_pub = datetime.fromtimestamp(pub_date_ts / 1000).strftime("%d/%m/%Y")
+            else:
+                data_pub = "Non specificata"
             bandi.append({
                 "Titolo": titolo,
                 "Scadenza": scadenza,
+                "Data pubblicazione": data_pub,
                 "Link": link,
                 "Fonte": f"UE - {programma}"
             })
@@ -211,7 +220,6 @@ def scrapa_incentivi_gov():
             nid = doc.get("nid", "")
             link = f"https://www.incentivi.gov.it/it/catalogo/{nid}"
             
-            # Filtra solo incentivi aperti
             if close_date:
                 scadenza_dt = datetime.strptime(close_date[:10], "%Y-%m-%d")
                 if scadenza_dt < oggi:
@@ -220,17 +228,23 @@ def scrapa_incentivi_gov():
             else:
                 scadenza = "Non specificata"
             
+            if open_date:
+                data_pub = datetime.strptime(open_date[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+            else:
+                data_pub = "Non specificata"
+            
             bandi.append({
                 "Titolo": titolo,
                 "Scadenza": scadenza,
+                "Data pubblicazione": data_pub,
                 "Link": link,
                 "Fonte": "incentivi.gov.it"
             })
-        
         return bandi
     except Exception as e:
         print(f"  ⚠️ Errore incentivi.gov.it: {e}")
         return []
+        
 def carica_bandi_visti():
     try:
         with open(FILE_BANDI_VISTI, "r", encoding="utf-8") as f:
@@ -476,22 +490,30 @@ df_finale.to_excel(filename, index=False)
 
 formatta_excel(filename, len(df_aperti), len(df_ns), len(df_scaduti))
 
-# Confronta con bandi già visti
-bandi_visti = carica_bandi_visti()
-bandi_aperti_lista = df_aperti.to_dict("records")
-bandi_nuovi = [b for b in bandi_aperti_lista if b["Titolo"] not in bandi_visti]
+# Filtra bandi pubblicati nelle ultime 48 ore
+from datetime import timedelta
+oggi = datetime.today()
+limite = oggi - timedelta(hours=48)
 
-# Aggiorna il file dei bandi visti
-tutti_titoli = set(df_aperti["Titolo"].tolist())
-salva_bandi_visti(tutti_titoli)
+bandi_aperti_lista = df_aperti.to_dict("records")
+bandi_nuovi = []
+
+for b in bandi_aperti_lista:
+    data_pub = b.get("Data pubblicazione", "Non specificata")
+    if data_pub and data_pub != "Non specificata":
+        try:
+            dt = datetime.strptime(data_pub, "%d/%m/%Y")
+            if dt >= limite:
+                bandi_nuovi.append(b)
+        except:
+            pass
 
 # Invia email se ci sono nuovi bandi
 if bandi_nuovi:
-    print(f"\n📧 Trovati {len(bandi_nuovi)} nuovi bandi — invio email...")
+    print(f"\n📧 Trovati {len(bandi_nuovi)} bandi pubblicati nelle ultime 48h — invio email...")
     invia_email_bandi(bandi_nuovi, len(df_aperti))
 else:
-    print("\n📭 Nessun nuovo bando trovato oggi.")
-
+    print("\n📭 Nessun nuovo bando pubblicato nelle ultime 48 ore.")
 print(f"\n✅ File Excel salvato con analisi AI!")
 print(f"   Aperti: {len(df_aperti)} | Non specificati: {len(df_ns)} | Scaduti: {len(df_scaduti)}")
 print(f"\nCompletato: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
