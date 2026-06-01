@@ -4,6 +4,28 @@ from datetime import datetime
 import requests
 import io
 
+# Autenticazione semplice
+PASSWORD = "G&lbison"  # cambia con la password che vuoi
+
+def check_password():
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        st.image("logo_lumen.png", width=120)
+        st.title("Monitor Bandi PMI Campania")
+        st.subheader("Accesso riservato | Lumen Advisors")
+        pwd = st.text_input("Password", type="password")
+        if st.button("Accedi"):
+            if pwd == PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Password errata")
+        st.stop()
+
+check_password()
+
 st.set_page_config(
     page_title="Monitor Bandi | Lumen Advisors",
     page_icon="logo_lumen.png",
