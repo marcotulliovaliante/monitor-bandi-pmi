@@ -1,19 +1,29 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import requests
+import io
 
 st.set_page_config(
-    page_title="Monitor Bandi PMI Campania",
-    page_icon="🔔",
+    page_title="Monitor Bandi | Lumen Advisors",
+    page_icon="logo_lumen.png",
     layout="wide"
 )
 
-st.title("🔔 Monitor Bandi PMI Campania")
-st.caption(f"Aggiornamento: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+# Logo e titolo
+col_logo, col_titolo = st.columns([1, 8])
+with col_logo:
+    st.image("logo_lumen.png", width=80)
+with col_titolo:
+    st.title("Monitor Bandi PMI Campania")
+    st.caption(f"Aggiornamento: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Lumen Advisors")
 
 # Carica i dati
 try:
-    df = pd.read_excel("bandi_campania.xlsx", sheet_name="Bandi")
+    import io
+url_excel = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
+response = requests.get(url_excel)
+df = pd.read_excel(io.BytesIO(response.content), sheet_name="Bandi")
     
     # Sidebar filtri
     st.sidebar.header("Filtri")
