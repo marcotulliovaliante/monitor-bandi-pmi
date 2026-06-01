@@ -20,7 +20,6 @@ with col_titolo:
 
 # Carica i dati
 try:
-    import io
 url_excel = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
 response = requests.get(url_excel)
 df = pd.read_excel(io.BytesIO(response.content), sheet_name="Bandi")
