@@ -83,27 +83,27 @@ try:
     
     st.divider()
     # Pannello di controllo
-        with st.expander("⚙️ Pannello di controllo"):
-            st.subheader("Lancia lo scraper manualmente")
-            st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
-            if st.button("🚀 Aggiorna bandi ora"):
-                import requests as req
-                token = st.secrets.get("PAT_TOKEN", "")
-                if token:
-                    r = req.post(
-                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
-                        headers={
-                            "Authorization": f"token {token}",
-                            "Accept": "application/vnd.github.v3+json"
-                        },
-                        json={"ref": "master"}
-                    )
-                    if r.status_code == 204:
-                        st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
-                    else:
-                        st.error(f"Errore: {r.status_code} — {r.text}")
-                else:
-                    st.error("PAT_TOKEN non configurato")
+    with st.expander("⚙️ Pannello di controllo"):
+    st.subheader("Lancia lo scraper manualmente")
+    st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
+    if st.button("🚀 Aggiorna bandi ora"):
+        import requests as req
+        token = st.secrets.get("PAT_TOKEN", "")
+        if token:
+            r = req.post(
+                "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
+                headers={
+                    "Authorization": f"token {token}",
+                    "Accept": "application/vnd.github.v3+json"
+                },
+                json={"ref": "master"}
+            )
+            if r.status_code == 204:
+                st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
+            else:
+                st.error(f"Errore: {r.status_code} — {r.text}")
+        else:
+            st.error("PAT_TOKEN non configurato")
 
     # Tabella
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
