@@ -4,13 +4,12 @@ from datetime import datetime
 import requests
 import io
 
-# Autenticazione semplice
-PASSWORD = "G&lbison"  # cambia con la password che vuoi
+# Autenticazione
+PASSWORD = "lumen2026"
 
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
-    
     if not st.session_state.authenticated:
         st.image("logo_lumen.png", width=120)
         st.title("Monitor Bandi PMI Campania")
@@ -19,7 +18,7 @@ def check_password():
         if st.button("Accedi"):
             if pwd == PASSWORD:
                 st.session_state.authenticated = True
-                st.rerun()  
+                st.rerun()
             else:
                 st.error("Password errata")
         st.stop()
@@ -32,7 +31,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Logo e titolo
 col_logo, col_titolo = st.columns([1, 8])
 with col_logo:
     st.image("logo_lumen.png", width=80)
@@ -40,30 +38,23 @@ with col_titolo:
     st.title("Monitor Bandi PMI Campania")
     st.caption(f"Aggiornamento: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Lumen Advisors")
 
-# Carica i dati
 try:
     url_excel = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
     response = requests.get(url_excel)
     df = pd.read_excel(io.BytesIO(response.content), sheet_name="Bandi")
-    
-    # Sidebar filtri
+
     st.sidebar.header("Filtri")
-    
     fonti = ["Tutte"] + sorted(df["Fonte"].unique().tolist())
     fonte_sel = st.sidebar.selectbox("Fonte", fonti)
-    
     stati = ["Tutti"] + sorted(df["Stato"].unique().tolist())
     stato_sel = st.sidebar.selectbox("Stato", stati)
-    
     if "Pertinenza PMI" in df.columns:
         pertinenze = ["Tutte"] + sorted(df["Pertinenza PMI"].dropna().unique().tolist())
         pertinenza_sel = st.sidebar.selectbox("Pertinenza PMI", pertinenze)
     else:
         pertinenza_sel = "Tutte"
-    
     cerca = st.sidebar.text_input("🔍 Cerca nel titolo")
-    
-    # Applica filtri
+
     df_filtrato = df.copy()
     if fonte_sel != "Tutte":
         df_filtrato = df_filtrato[df_filtrato["Fonte"] == fonte_sel]
@@ -73,41 +64,39 @@ try:
         df_filtrato = df_filtrato[df_filtrato["Pertinenza PMI"] == pertinenza_sel]
     if cerca:
         df_filtrato = df_filtrato[df_filtrato["Titolo"].str.contains(cerca, case=False, na=False)]
-    
-    # Metriche
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Totale bandi", len(df))
     col2.metric("Bandi aperti", len(df[df["Stato"] == "✅ Aperto"]))
     col3.metric("Risultati filtrati", len(df_filtrato))
     col4.metric("Fonti monitorate", df["Fonte"].nunique())
-    
-    st.divider()
-    # Pannello di controllo
-    with st.expander("⚙️ Pannello di controllo"):
-    st.subheader("Lancia lo scraper manualmente")
-    st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
-    if st.button("🚀 Aggiorna bandi ora"):
-        import requests as req
-        token = st.secrets.get("PAT_TOKEN", "")
-        if token:
-            r = req.post(
-                "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
-                headers={
-                    "Authorization": f"token {token}",
-                    "Accept": "application/vnd.github.v3+json"
-                },
-                json={"ref": "master"}
-            )
-            if r.status_code == 204:
-                st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
-            else:
-                st.error(f"Errore: {r.status_code} — {r.text}")
-        else:
-            st.error("PAT_TOKEN non configurato")
 
-    # Tabella
+    st.divider()
+
+    with st.expander("⚙️ Pannello di controllo"):
+        st.subheader("Lancia lo scraper manualmente")
+        st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
+        if st.button("🚀 Aggiorna bandi ora"):
+            token = st.secrets.get("PAT_TOKEN", "")
+            if token:
+                r = requests.post(
+                    "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
+                    headers={
+                        "Authorization": f"token {token}",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    json={"ref": "master"}
+                )
+                if r.status_code == 204:
+                    st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
+                else:
+                    st.error(f"Errore: {r.status_code} — {r.text}")
+            else:
+                st.error("PAT_TOKEN non configurato")
+
+    st.divider()
+
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
-    
     colonne = ["Titolo", "Scadenza", "Stato", "Fonte"]
     if "Pertinenza PMI" in df.columns:
         colonne.append("Pertinenza PMI")
@@ -115,7 +104,7 @@ try:
         colonne.append("Categoria")
     if "Link" in df.columns:
         colonne.append("Link")
-    
+
     st.dataframe(
         df_filtrato[colonne],
         use_container_width=True,
@@ -125,16 +114,15 @@ try:
             "Titolo": st.column_config.TextColumn("Titolo", width="large"),
         }
     )
-    
-    # Export Excel
+
     st.divider()
-    excel_data = df_filtrato.to_csv(index=False).encode("utf-8")
+    csv_data = df_filtrato.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="⬇️ Scarica CSV",
-        data=excel_data,
+        data=csv_data,
         file_name=f"bandi_filtrati_{datetime.now().strftime('%Y%m%d')}.csv",
         mime="text/csv"
     )
 
-except FileNotFoundError:
-    st.error("File bandi_campania.xlsx non trovato. Esegui prima scraper_bandi.py!")
+except Exception as e:
+    st.error(f"Errore nel caricamento dei dati: {e}")
