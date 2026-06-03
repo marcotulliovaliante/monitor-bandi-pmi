@@ -16,7 +16,14 @@ from email.mime.text import MIMEText
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  
 GMAIL_USER = os.environ.get("GMAIL_USER", "marcotullio.valiante@gmail.com")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "gedk gkdb nxvx liqo")
-EMAIL_DESTINATARIO = os.environ.get("EMAIL_DESTINATARIO", "marcotullio.valiante@gmail.com")
+EMAIL_DESTINATARIO = os.environ.get("EMAIL_DESTINATARIO", "")
+def carica_destinatari():
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            return config.get("destinatari", [EMAIL_DESTINATARIO])
+    except:
+        return [EMAIL_DESTINATARIO]
 FILE_BANDI_VISTI = "bandi_visti.json"
 
 def analizza_bando_con_claude(titolo, fonte, scadenza):
@@ -261,7 +268,8 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"🔔 Monitor Bandi — {len(bandi_nuovi)} nuovi bandi — {datetime.now().strftime('%d/%m/%Y')}"
         msg["From"] = GMAIL_USER
-        msg["To"] = EMAIL_DESTINATARIO
+        destinatari = carica_destinatari()
+        msg["To"] = ", ".join(destinatari)
 
         righe = ""
         for b in bandi_nuovi[:20]:
@@ -302,8 +310,8 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
         msg.attach(MIMEText(html, "html"))
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD.replace(" ", ""))
-            server.sendmail(GMAIL_USER, EMAIL_DESTINATARIO, msg.as_string())
-        print(f"✅ Email inviata a {EMAIL_DESTINATARIO}")
+            server.sendmail(GMAIL_USER, destinatari, msg.as_string())
+        print(f"✅ Email inviata a {', '.join(destinatari)}")
     except Exception as e:
         print(f"⚠️ Errore invio email: {e}")
 

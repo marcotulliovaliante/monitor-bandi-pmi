@@ -77,6 +77,48 @@ try:
         st.subheader("Lancia lo scraper manualmente")
         st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
         if st.button("🚀 Aggiorna bandi ora"):
+            st.divider()
+        st.subheader("📧 Gestione destinatari email")
+        
+        # Carica destinatari attuali
+        try:
+            r_config = requests.get(
+                "https://raw.githubusercontent.com/marcotulliovaliante/monitor-bandi-pmi/master/config.json"
+            )
+            config = r_config.json()
+            destinatari = config.get("destinatari", [])
+        except:
+            destinatari = []
+        
+        st.write("**Destinatari attuali:**")
+        for email in destinatari:
+            st.write(f"• {email}")
+        
+        nuova_email = st.text_input("Aggiungi email")
+        if st.button("➕ Aggiungi destinatario"):
+            if nuova_email and nuova_email not in destinatari:
+                destinatari.append(nuova_email)
+                token = st.secrets.get("PAT_TOKEN", "")
+                if token:
+                    import base64
+                    import json as json_lib
+                    nuovo_config = json_lib.dumps({"destinatari": destinatari}, indent=4)
+                    r_get = requests.get(
+                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
+                        headers={"Authorization": f"token {token}"}
+                    )
+                    sha = r_get.json().get("sha", "")
+                    requests.put(
+                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
+                        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"},
+                        json={
+                            "message": f"Aggiunto destinatario {nuova_email}",
+                            "content": base64.b64encode(nuovo_config.encode()).decode(),
+                            "sha": sha
+                        }
+                    )
+                    st.success(f"✅ {nuova_email} aggiunto!")
+                    st.rerun()
             token = st.secrets.get("PAT_TOKEN", "")
             if token:
                 r = requests.post(
