@@ -5,19 +5,23 @@ import requests
 import io
 
 # Autenticazione
-PASSWORD = "lumen2026"
+PASSWORD_USER = "lumen2026"
+PASSWORD_ADMIN = "lumenadmin2026"
 
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-    if not st.session_state.authenticated:
+    if "ruolo" not in st.session_state:
+        st.session_state.ruolo = None
+    if st.session_state.ruolo is None:
         st.image("logo_lumen.png", width=120)
         st.title("Monitor Bandi PMI Campania")
         st.subheader("Accesso riservato | Lumen Advisors")
         pwd = st.text_input("Password", type="password")
         if st.button("Accedi"):
-            if pwd == PASSWORD:
-                st.session_state.authenticated = True
+            if pwd == PASSWORD_ADMIN:
+                st.session_state.ruolo = "admin"
+                st.rerun()
+            elif pwd == PASSWORD_USER:
+                st.session_state.ruolo = "user"
                 st.rerun()
             else:
                 st.error("Password errata")
@@ -73,70 +77,70 @@ try:
 
     st.divider()
 
-    with st.expander("⚙️ Pannello di controllo"):
-        st.subheader("Lancia lo scraper manualmente")
-        st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
-        if st.button("🚀 Aggiorna bandi ora"):
-            st.divider()
-        st.subheader("📧 Gestione destinatari email")
-        
-        # Carica destinatari attuali
-        try:
-            r_config = requests.get(
-                "https://raw.githubusercontent.com/marcotulliovaliante/monitor-bandi-pmi/master/config.json"
-            )
-            config = r_config.json()
-            destinatari = config.get("destinatari", [])
-        except:
-            destinatari = []
-        
-        st.write("**Destinatari attuali:**")
-        for email in destinatari:
-            st.write(f"• {email}")
-        
-        nuova_email = st.text_input("Aggiungi email")
-        if st.button("➕ Aggiungi destinatario"):
-            if nuova_email and nuova_email not in destinatari:
-                destinatari.append(nuova_email)
+    if st.session_state.ruolo == "admin":
+        with st.expander("⚙️ Pannello di controllo"):
+            st.subheader("Lancia lo scraper manualmente")
+            st.caption("Avvia il workflow GitHub Actions per aggiornare i bandi")
+            if st.button("🚀 Aggiorna bandi ora"):
                 token = st.secrets.get("PAT_TOKEN", "")
                 if token:
-                    import base64
-                    import json as json_lib
-                    nuovo_config = json_lib.dumps({"destinatari": destinatari}, indent=4)
-                    r_get = requests.get(
-                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
-                        headers={"Authorization": f"token {token}"}
+                    r = requests.post(
+                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
+                        headers={
+                            "Authorization": f"token {token}",
+                            "Accept": "application/vnd.github.v3+json"
+                        },
+                        json={"ref": "master"}
                     )
-                    sha = r_get.json().get("sha", "")
-                    requests.put(
-                        "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
-                        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"},
-                        json={
-                            "message": f"Aggiunto destinatario {nuova_email}",
-                            "content": base64.b64encode(nuovo_config.encode()).decode(),
-                            "sha": sha
-                        }
-                    )
-                    st.success(f"✅ {nuova_email} aggiunto!")
-                    st.rerun()
-            token = st.secrets.get("PAT_TOKEN", "")
-            if token:
-                r = requests.post(
-                    "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/actions/workflows/monitor_bandi.yml/dispatches",
-                    headers={
-                        "Authorization": f"token {token}",
-                        "Accept": "application/vnd.github.v3+json"
-                    },
-                    json={"ref": "master"}
-                )
-                if r.status_code == 204:
-                    st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
+                    if r.status_code == 204:
+                        st.success("✅ Workflow avviato! Attendi 15 minuti per i risultati.")
+                    else:
+                        st.error(f"Errore: {r.status_code} — {r.text}")
                 else:
-                    st.error(f"Errore: {r.status_code} — {r.text}")
-            else:
-                st.error("PAT_TOKEN non configurato")
+                    st.error("PAT_TOKEN non configurato")
 
-    st.divider()
+            st.divider()
+            st.subheader("📧 Gestione destinatari email")
+            try:
+                r_config = requests.get(
+                    "https://raw.githubusercontent.com/marcotulliovaliante/monitor-bandi-pmi/master/config.json"
+                )
+                config = r_config.json()
+                destinatari = config.get("destinatari", [])
+            except:
+                destinatari = []
+
+            st.write("**Destinatari attuali:**")
+            for email in destinatari:
+                st.write(f"• {email}")
+
+            nuova_email = st.text_input("Aggiungi email")
+            if st.button("➕ Aggiungi destinatario"):
+                if nuova_email and nuova_email not in destinatari:
+                    destinatari.append(nuova_email)
+                    token = st.secrets.get("PAT_TOKEN", "")
+                    if token:
+                        import base64
+                        import json as json_lib
+                        nuovo_config = json_lib.dumps({"destinatari": destinatari}, indent=4)
+                        r_get = requests.get(
+                            "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
+                            headers={"Authorization": f"token {token}"}
+                        )
+                        sha = r_get.json().get("sha", "")
+                        requests.put(
+                            "https://api.github.com/repos/marcotulliovaliante/monitor-bandi-pmi/contents/config.json",
+                            headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"},
+                            json={
+                                "message": f"Aggiunto destinatario {nuova_email}",
+                                "content": base64.b64encode(nuovo_config.encode()).decode(),
+                                "sha": sha
+                            }
+                        )
+                        st.success(f"✅ {nuova_email} aggiunto!")
+                        st.rerun()
+
+        st.divider()
 
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
     colonne = ["Titolo", "Scadenza", "Stato", "Fonte"]
