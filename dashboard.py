@@ -142,7 +142,6 @@ try:
 
         st.divider()
 
-    # Tabella principale
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
 
     colonne_principali = ["Titolo", "Scadenza", "Fonte"]
@@ -164,7 +163,6 @@ try:
         }
     )
 
-    # Dettaglio bando
     st.divider()
     st.subheader("🔍 Dettaglio bando")
     titoli = ["— Seleziona un bando —"] + df_filtrato["Titolo"].tolist()
@@ -186,30 +184,28 @@ try:
                 st.markdown(f"**Categoria:** {bando['Categoria']}")
             if "Motivazione AI" in bando:
                 st.markdown(f"**Analisi AI:** {bando['Motivazione AI']}")
-st.divider()
-col_down1, col_down2 = st.columns(2)
-with col_down1:
-    # Scarica Excel completo da GitHub
-    excel_url = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
-    r_excel = requests.get(excel_url)
-    st.download_button(
-        label="⬇️ Scarica Excel completo",
-        data=r_excel.content,
-        file_name=f"bandi_campania_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-with col_down2:
-    # Scarica CSV filtrato
-    csv_data = df_filtrato.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️ Scarica CSV filtrato",
-        data=csv_data,
-        file_name=f"bandi_filtrati_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv"
-    )            if "Link" in bando and bando["Link"]:
-                st.link_button("🔗 Vai al bando", bando["Link"])
+            if "Link" in bando and bando["Link"]:
+                st.link_button("🔗 Vai al bando", str(bando["Link"]))
 
-
+    st.divider()
+    col_down1, col_down2 = st.columns(2)
+    with col_down1:
+        excel_url = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
+        r_excel = requests.get(excel_url)
+        st.download_button(
+            label="⬇️ Scarica Excel completo",
+            data=r_excel.content,
+            file_name=f"bandi_campania_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    with col_down2:
+        csv_data = df_filtrato.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Scarica CSV filtrato",
+            data=csv_data,
+            file_name=f"bandi_filtrati_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
 
 except Exception as e:
     st.error(f"Errore nel caricamento dei dati: {e}")
