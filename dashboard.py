@@ -142,24 +142,52 @@ try:
 
         st.divider()
 
+    # Tabella principale
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
-    colonne = ["Titolo", "Scadenza", "Stato", "Fonte"]
+
+    colonne_principali = ["Titolo", "Scadenza", "Fonte"]
     if "Pertinenza PMI" in df.columns:
-        colonne.append("Pertinenza PMI")
-    if "Categoria" in df.columns:
-        colonne.append("Categoria")
+        colonne_principali.append("Pertinenza PMI")
     if "Link" in df.columns:
-        colonne.append("Link")
+        colonne_principali.append("Link")
 
     st.dataframe(
-        df_filtrato[colonne],
+        df_filtrato[colonne_principali],
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Link": st.column_config.LinkColumn("Link"),
             "Titolo": st.column_config.TextColumn("Titolo", width="large"),
+            "Scadenza": st.column_config.TextColumn("Scadenza", width="medium"),
+            "Fonte": st.column_config.TextColumn("Fonte", width="medium"),
+            "Pertinenza PMI": st.column_config.TextColumn("Pertinenza", width="small"),
+            "Link": st.column_config.LinkColumn("🔗", width="small", display_text="Apri"),
         }
     )
+
+    # Dettaglio bando
+    st.divider()
+    st.subheader("🔍 Dettaglio bando")
+    titoli = ["— Seleziona un bando —"] + df_filtrato["Titolo"].tolist()
+    bando_sel = st.selectbox("Seleziona bando", titoli)
+
+    if bando_sel != "— Seleziona un bando —":
+        bando = df_filtrato[df_filtrato["Titolo"] == bando_sel].iloc[0]
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Titolo:** {bando['Titolo']}")
+            st.markdown(f"**Fonte:** {bando['Fonte']}")
+            st.markdown(f"**Scadenza:** {bando['Scadenza']}")
+            if "Data pubblicazione" in bando:
+                st.markdown(f"**Data pubblicazione:** {bando['Data pubblicazione']}")
+        with col2:
+            if "Pertinenza PMI" in bando:
+                st.markdown(f"**Pertinenza PMI:** {bando['Pertinenza PMI']}")
+            if "Categoria" in bando:
+                st.markdown(f"**Categoria:** {bando['Categoria']}")
+            if "Motivazione AI" in bando:
+                st.markdown(f"**Analisi AI:** {bando['Motivazione AI']}")
+            if "Link" in bando and bando["Link"]:
+                st.link_button("🔗 Vai al bando", bando["Link"])
 
     st.divider()
     csv_data = df_filtrato.to_csv(index=False).encode("utf-8")

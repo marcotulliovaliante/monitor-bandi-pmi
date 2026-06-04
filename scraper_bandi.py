@@ -82,34 +82,7 @@ def calcola_stato(scadenza_testo):
         return "Non specificata"
     return "✅ Aperto" if data >= datetime.today() else "❌ Scaduto"
 
-def scrapa_invitalia():
-    try:
-        url = "https://www.invitalia.it/cosa-facciamo/rafforziamo-le-imprese"
-        risposta = requests.get(url, timeout=10)
-        soup = BeautifulSoup(risposta.text, "html.parser")
-        bandi = []
-        titolo_corrente = None
-        for tag in soup.find_all(["h3", "p"]):
-            testo = tag.text.strip()
-            if tag.name == "h3" and len(testo) > 5:
-                titolo_corrente = testo
-            if tag.name == "p" and "Attivo" in testo and titolo_corrente:
-                info = testo.replace("Attivo", "").strip()
-                chiusura = ""
-                if "Data apertura:" in info:
-                    parti = info.split("Data chiusura:")
-                    chiusura = parti[1].strip() if len(parti) > 1 else ""
-                bandi.append({
-                    "Titolo": titolo_corrente,
-                    "Scadenza": chiusura if chiusura else "Non specificata",
-                    "Data pubblicazione": "Non specificata",
-                    "Link": "https://www.invitalia.it/cosa-facciamo/rafforziamo-le-imprese",
-                    "Fonte": "Invitalia"
-                })
-        return bandi
-    except Exception as e:
-        print(f"  ⚠️ Errore Invitalia: {e}")
-        return []
+
 
 def scrapa_regione_campania():
     try:
@@ -134,8 +107,58 @@ def scrapa_regione_campania():
                             "Scadenza": scadenza,
                             "Data pubblicazione": "Non specificata",
                             "Link": link,
-                            "Fonte": "Regione Campania - Agricoltura"
-                        })
+                    "Fonte": "Regione Campania - Agricoltura"
+                })
+        return bandi
+    except Exception as e:
+        print(f"  ⚠️ Errore Regione Campania: {e}")
+        return []
+def scrapa_invitalia():
+    try:
+        url = "https://www.invitalia.it/per-le-imprese/incentivi-e-strumenti"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        risposta = requests.get(url, timeout=10, headers=headers)
+        soup = BeautifulSoup(risposta.text, "html.parser")
+        bandi = []
+
+        for card in soup.find_all("div", class_="card-body"):
+            # Stato
+            stato_tag = soup.find("div", class_=lambda x: x and "attivo" in x.lower())
+            
+            # Titolo
+            titolo_tag = card.find("h3")
+            if not titolo_tag:
+                continue
+            titolo = titolo_tag.text.strip()
+            
+            # Link diretto
+            link_tag = card.find("a", class_=lambda x: x and "read-more" in x)
+            if link_tag:
+                href = link_tag.get("href", "")
+                link = f"https://www.invitalia.it{href}" if href.startswith("/") else href
+            else:
+                link = url
+            
+            # Date
+            scadenza = "Non specificata"
+            date_div = card.find("p", class_=lambda x: x and "dateContainer" in x)
+            if date_div:
+                testo_date = date_div.text.strip()
+                if "chiusura" in testo_date.lower():
+                    scadenza = testo_date.split("chiusura:")[-1].strip() if "chiusura:" in testo_date.lower() else testo_date
+
+            if titolo:
+                bandi.append({
+                    "Titolo": titolo,
+                    "Scadenza": scadenza,
+                    "Data pubblicazione": "Non specificata",
+                    "Link": link,
+                    "Fonte": "Invitalia"
+                })
+        return bandi
+    except Exception as e:
+        print(f"  ⚠️ Errore Invitalia: {e}")
+        return []        
         return bandi
     except Exception as e:
         print(f"  ⚠️ Errore Regione Campania: {e}")
