@@ -289,7 +289,7 @@ def salva_bandi_visti(titoli):
 def invia_email_bandi(bandi_nuovi, totale_aperti):
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🔔 Monitor Bandi — {len(bandi_nuovi)} nuovi bandi — {datetime.now().strftime('%d/%m/%Y')}"
+        msg["Subject"] = f"🔔 Lumen Scout — {len(bandi_nuovi)} nuovi bandi — {datetime.now().strftime('%d/%m/%Y')}"
         msg["From"] = GMAIL_USER
         destinatari = carica_destinatari()
         msg["To"] = ", ".join(destinatari)
@@ -308,15 +308,16 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
 
         html = f"""
         <html><body style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto">
-            <div style="background:#1A56DB;color:white;padding:20px;border-radius:8px 8px 0 0">
-                <h2 style="margin:0">🔔 Monitor Bandi PMI Campania</h2>
+            <div style="background:#0a2e22;color:white;padding:20px;border-radius:8px 8px 0 0">
+                <h2 style="margin:0">🔔 Lumen Scout</h2>
+                <p style="margin:3px 0 0 0;color:#C9A84C;font-size:13px">Lumen Opportunities | Lumen Advisors</p>
                 <p style="margin:5px 0 0 0">{datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
             </div>
             <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px">
                 <p>Sono stati trovati <strong>{len(bandi_nuovi)} nuovi bandi</strong> oggi.<br>
                 Totale bandi aperti nel sistema: <strong>{totale_aperti}</strong></p>
                 <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px">
-                    <tr style="background:#1A56DB;color:white">
+                    <tr style="background:#0F6E56;color:white">
                         <th style="padding:10px;text-align:left">Titolo</th>
                         <th style="padding:10px;text-align:left">Scadenza</th>
                         <th style="padding:10px;text-align:left">Pertinenza</th>
@@ -325,7 +326,7 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
                     {righe}
                 </table>
                 <p style="color:#6B7280;font-size:12px;margin-top:20px">
-                    Monitor Bandi PMI Campania — aggiornamento automatico giornaliero
+                    Lumen Scout — Lumen Opportunities | Lumen Advisors — aggiornamento automatico giornaliero
                 </p>
             </div>
         </body></html>"""
@@ -379,7 +380,7 @@ def formatta_excel(filename, n_aperti, n_ns, n_scaduti):
             cell.alignment = Alignment(wrap_text=True, vertical="center")
         ws.row_dimensions[row[0].row].height = 30
     ws2 = wb.create_sheet("Riepilogo")
-    ws2["A1"] = "Monitor Bandi PMI Campania"
+    ws2["A1"] = "Lumen Scout — Monitor Bandi e Finanziamenti"
     ws2["A1"].font = Font(bold=True, size=14, color="1A56DB")
     ws2["A3"] = "Ultimo aggiornamento:"
     ws2["B3"] = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -406,7 +407,7 @@ def formatta_excel(filename, n_aperti, n_ns, n_scaduti):
 
 # === MAIN ===
 print("=" * 50)
-print("MONITOR BANDI PMI CAMPANIA")
+print("LUMEN SCOUT — MONITOR BANDI")
 print(f"Avvio: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 print("=" * 50)
 
@@ -454,7 +455,7 @@ print(f"\nCompletato: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 print("=" * 50)
 
 print("=" * 50)
-print("MONITOR BANDI PMI CAMPANIA")
+print("LUMEN SCOUT — MONITOR BANDI")
 print(f"Avvio: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 print("=" * 50)
 

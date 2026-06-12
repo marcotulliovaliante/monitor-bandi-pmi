@@ -13,8 +13,9 @@ def check_password():
         st.session_state.ruolo = None
     if st.session_state.ruolo is None:
         st.image("logo_lumen.png", width=120)
-        st.title("Monitor Bandi PMI Campania")
-        st.subheader("Accesso riservato | Lumen Advisors")
+        st.title("Lumen Scout")
+        st.subheader("Monitor bandi e finanziamenti | Lumen Opportunities")
+        st.caption("Accesso riservato — Lumen Advisors")
         pwd = st.text_input("Password", type="password")
         if st.button("Accedi"):
             if pwd == PASSWORD_ADMIN:
@@ -30,7 +31,7 @@ def check_password():
 check_password()
 
 st.set_page_config(
-    page_title="Monitor Bandi | Lumen Advisors",
+    page_title="Lumen Scout | Lumen Advisors",
     page_icon="logo_lumen.png",
     layout="wide"
 )
@@ -39,8 +40,8 @@ col_logo, col_titolo = st.columns([1, 8])
 with col_logo:
     st.image("logo_lumen.png", width=80)
 with col_titolo:
-    st.title("Monitor Bandi PMI Campania")
-    st.caption(f"Aggiornamento: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Lumen Advisors")
+    st.title("Lumen Scout")
+    st.caption(f"Monitor bandi e finanziamenti — Lumen Opportunities | Lumen Advisors · Aggiornamento: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
 try:
     url_excel = "https://github.com/marcotulliovaliante/monitor-bandi-pmi/raw/master/bandi_campania.xlsx"
