@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import anthropic
@@ -15,8 +15,9 @@ from email.mime.text import MIMEText
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  
 GMAIL_USER = os.environ.get("GMAIL_USER", "marcotullio.valiante@gmail.com")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "gedk gkdb nxvx liqo")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 EMAIL_DESTINATARIO = os.environ.get("EMAIL_DESTINATARIO", "")
+
 def carica_destinatari():
     try:
         with open("config.json", "r", encoding="utf-8") as f:
@@ -24,6 +25,7 @@ def carica_destinatari():
             return config.get("destinatari", [EMAIL_DESTINATARIO])
     except:
         return [EMAIL_DESTINATARIO]
+
 FILE_BANDI_VISTI = "bandi_visti.json"
 
 def analizza_bando_con_claude(titolo, fonte, scadenza):
@@ -45,15 +47,15 @@ Sostituisci i valori con la tua analisi. Pertinenza può essere Alta, Media o Ba
             }]
         )
         testo = messaggio.content[0].text.strip()
-        # Cerca il JSON nella risposta
-        import re
         match = re.search(r'\{.*\}', testo, re.DOTALL)
         if match:
             return json.loads(match.group())
         return {"pertinenza": "N/D", "categoria": "N/D", "motivazione": testo[:100]}
     except Exception as e:
         return {"pertinenza": "N/D", "categoria": "N/D", "motivazione": str(e)}
+
 BASE_URL_CAMPANIA = "https://agricoltura.regione.campania.it/"
+
 def parse_data(testo):
     if not testo or testo == "Non specificata":
         return None
@@ -82,8 +84,6 @@ def calcola_stato(scadenza_testo):
         return "Non specificata"
     return "✅ Aperto" if data >= datetime.today() else "❌ Scaduto"
 
-
-
 def scrapa_regione_campania():
     try:
         url = BASE_URL_CAMPANIA + "bandi.html"
@@ -107,12 +107,13 @@ def scrapa_regione_campania():
                             "Scadenza": scadenza,
                             "Data pubblicazione": "Non specificata",
                             "Link": link,
-                    "Fonte": "Regione Campania - Agricoltura"
-                })
+                            "Fonte": "Regione Campania - Agricoltura"
+                        })
         return bandi
     except Exception as e:
         print(f"  ⚠️ Errore Regione Campania: {e}")
         return []
+
 def scrapa_invitalia():
     try:
         url = "https://www.invitalia.it/per-le-imprese/incentivi-e-strumenti"
@@ -122,23 +123,25 @@ def scrapa_invitalia():
         bandi = []
 
         for card in soup.find_all("div", class_="card-body"):
-            # Stato
-            stato_tag = soup.find("div", class_=lambda x: x and "attivo" in x.lower())
-            
             # Titolo
             titolo_tag = card.find("h3")
             if not titolo_tag:
                 continue
             titolo = titolo_tag.text.strip()
-            
-            # Link diretto
+
+            # Link diretto — cerca prima read-more, poi qualsiasi link con /incentivi-e-strumenti/
             link_tag = card.find("a", class_=lambda x: x and "read-more" in x)
             if link_tag:
                 href = link_tag.get("href", "")
                 link = f"https://www.invitalia.it{href}" if href.startswith("/") else href
             else:
-                link = url
-            
+                link_tag = card.find("a", href=lambda x: x and "/incentivi-e-strumenti/" in x)
+                if link_tag:
+                    href = link_tag.get("href", "")
+                    link = f"https://www.invitalia.it{href}" if href.startswith("/") else href
+                else:
+                    link = url
+
             # Date
             scadenza = "Non specificata"
             date_div = card.find("p", class_=lambda x: x and "dateContainer" in x)
@@ -158,12 +161,8 @@ def scrapa_invitalia():
         return bandi
     except Exception as e:
         print(f"  ⚠️ Errore Invitalia: {e}")
-        return []        
-        return bandi
-    except Exception as e:
-        print(f"  ⚠️ Errore Regione Campania: {e}")
         return []
-    
+
 def scrapa_gal_cilento():
     try:
         url = "https://www.galcilento.it/bandi/"
@@ -232,49 +231,51 @@ def scrapa_bandi_ue():
         return []
 
 def scrapa_incentivi_gov():
-    try:
-        print("  Scaricando incentivi da incentivi.gov.it...")
-        url = "https://www.incentivi.gov.it/solr/coredrupal/select?q.op=OR&wt=json&rows=8000&fl=nid%3Azs_nid%2Cpage_title%3Azs_title%2Copen_date%3Azs_field_open_date%2Cclose_date%3Azs_field_close_date%2Cregions%3Azm_field_regions%2Csubject_type%3Azm_field_subject_type%2Csupport_form%3Azm_field_support_form%2C&q=index_id%3Aincentivi&sort=ds_last_update+desc"
-        
-        risposta = requests.get(url, timeout=30)
-        data = risposta.json()
-        docs = data["response"]["docs"]
-        
-        oggi = datetime.today()
-        bandi = []
-        
-        for doc in docs:
-            titolo = doc.get("page_title", "N/D")
-            close_date = doc.get("close_date", "")
-            open_date = doc.get("open_date", "")
-            nid = doc.get("nid", "")
-            link = f"https://www.incentivi.gov.it/it/catalogo/{nid}"
-            
-            if close_date:
-                scadenza_dt = datetime.strptime(close_date[:10], "%Y-%m-%d")
-                if scadenza_dt < oggi:
-                    continue
-                scadenza = scadenza_dt.strftime("%d/%m/%Y")
-            else:
-                scadenza = "Non specificata"
-            
-            if open_date:
-                data_pub = datetime.strptime(open_date[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
-            else:
-                data_pub = "Non specificata"
-            
-            bandi.append({
-                "Titolo": titolo,
-                "Scadenza": scadenza,
-                "Data pubblicazione": data_pub,
-                "Link": link,
-                "Fonte": "incentivi.gov.it"
-            })
-        return bandi
-    except Exception as e:
-        print(f"  ⚠️ Errore incentivi.gov.it: {e}")
-        return []
-        
+    url = "https://www.incentivi.gov.it/solr/coredrupal/select?q.op=OR&wt=json&rows=8000&fl=nid%3Azs_nid%2Cpage_title%3Azs_title%2Copen_date%3Azs_field_open_date%2Cclose_date%3Azs_field_close_date%2Cregions%3Azm_field_regions%2Csubject_type%3Azm_field_subject_type%2Csupport_form%3Azm_field_support_form%2C&q=index_id%3Aincentivi&sort=ds_last_update+desc"
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; LumenScout/1.0)"}
+    
+    for tentativo in range(1, 4):
+        try:
+            print(f"  Scaricando incentivi da incentivi.gov.it (tentativo {tentativo}/3)...")
+            risposta = requests.get(url, timeout=60, headers=headers)
+            data = risposta.json()
+            docs = data["response"]["docs"]
+            oggi = datetime.today()
+            bandi = []
+            for doc in docs:
+                titolo = doc.get("page_title", "N/D")
+                close_date = doc.get("close_date", "")
+                open_date = doc.get("open_date", "")
+                nid = doc.get("nid", "")
+                link = f"https://www.incentivi.gov.it/it/catalogo/{nid}"
+                if close_date:
+                    scadenza_dt = datetime.strptime(close_date[:10], "%Y-%m-%d")
+                    if scadenza_dt < oggi:
+                        continue
+                    scadenza = scadenza_dt.strftime("%d/%m/%Y")
+                else:
+                    scadenza = "Non specificata"
+                if open_date:
+                    data_pub = datetime.strptime(open_date[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+                else:
+                    data_pub = "Non specificata"
+                bandi.append({
+                    "Titolo": titolo,
+                    "Scadenza": scadenza,
+                    "Data pubblicazione": data_pub,
+                    "Link": link,
+                    "Fonte": "incentivi.gov.it"
+                })
+            print(f"  ✅ incentivi.gov.it: {len(bandi)} bandi trovati")
+            return bandi
+        except Exception as e:
+            print(f"  ⚠️ Tentativo {tentativo} fallito: {e}")
+            if tentativo < 3:
+                import time
+                time.sleep(10 * tentativo)
+    print("  ⚠️ incentivi.gov.it non raggiungibile dopo 3 tentativi — fonte saltata")
+    return []
+
 def carica_bandi_visti():
     try:
         with open(FILE_BANDI_VISTI, "r", encoding="utf-8") as f:
@@ -343,7 +344,7 @@ def formatta_excel(filename, n_aperti, n_ns, n_scaduti):
     wb = load_workbook(filename)
     ws = wb.active
     ws.title = "Bandi"
-    header_fill = PatternFill("solid", fgColor="1A56DB")
+    header_fill = PatternFill("solid", fgColor="0F6E56")
     header_font = Font(bold=True, color="FFFFFF", size=11)
     aperto_fill = PatternFill("solid", fgColor="DCFCE7")
     scaduto_fill = PatternFill("solid", fgColor="FEE2E2")
@@ -381,7 +382,7 @@ def formatta_excel(filename, n_aperti, n_ns, n_scaduti):
         ws.row_dimensions[row[0].row].height = 30
     ws2 = wb.create_sheet("Riepilogo")
     ws2["A1"] = "Lumen Scout — Monitor Bandi e Finanziamenti"
-    ws2["A1"].font = Font(bold=True, size=14, color="1A56DB")
+    ws2["A1"].font = Font(bold=True, size=14, color="0F6E56")
     ws2["A3"] = "Ultimo aggiornamento:"
     ws2["B3"] = datetime.now().strftime("%d/%m/%Y %H:%M")
     ws2["A3"].font = Font(bold=True)
@@ -391,16 +392,17 @@ def formatta_excel(filename, n_aperti, n_ns, n_scaduti):
     ws2["A7"] = "• Regione Campania - Agricoltura"
     ws2["A8"] = "• GAL Cilento"
     ws2["A9"] = "• UE - Funding & Tenders Portal"
-    ws2["A11"] = "Totale bandi:"
-    ws2["B11"] = n_aperti + n_ns + n_scaduti
-    ws2["A12"] = "✅ Aperti:"
-    ws2["B12"] = n_aperti
-    ws2["A12"].font = Font(color="166534")
-    ws2["A13"] = "⏳ Non specificati:"
-    ws2["B13"] = n_ns
-    ws2["A14"] = "❌ Scaduti:"
-    ws2["B14"] = n_scaduti
-    ws2["A14"].font = Font(color="991B1B")
+    ws2["A10"] = "• incentivi.gov.it"
+    ws2["A12"] = "Totale bandi:"
+    ws2["B12"] = n_aperti + n_ns + n_scaduti
+    ws2["A13"] = "✅ Aperti:"
+    ws2["B13"] = n_aperti
+    ws2["A13"].font = Font(color="166534")
+    ws2["A14"] = "⏳ Non specificati:"
+    ws2["B14"] = n_ns
+    ws2["A15"] = "❌ Scaduti:"
+    ws2["B15"] = n_scaduti
+    ws2["A15"].font = Font(color="991B1B")
     ws2.column_dimensions["A"].width = 28
     ws2.column_dimensions["B"].width = 20
     wb.save(filename)
@@ -431,51 +433,7 @@ print("Scaricando bandi da portale UE...")
 bandi_ue = scrapa_bandi_ue()
 print(f"  → {len(bandi_ue)} bandi trovati")
 
-tutti_i_bandi = bandi_invitalia + bandi_campania + bandi_gal + bandi_ue
-print(f"\nTotale bandi raccolti: {len(tutti_i_bandi)}")
-
-df = pd.DataFrame(tutti_i_bandi)
-df["Stato"] = df["Scadenza"].apply(calcola_stato)
-df["_data_ord"] = df["Scadenza"].apply(parse_data)
-
-df_aperti = df[df["Stato"] == "✅ Aperto"].sort_values("_data_ord")
-df_ns = df[df["Stato"] == "Non specificata"]
-df_scaduti = df[df["Stato"] == "❌ Scaduto"].sort_values("_data_ord", ascending=False)
-
-df_finale = pd.concat([df_aperti, df_ns, df_scaduti]).drop(columns=["_data_ord"])
-
-filename = "bandi_campania.xlsx"
-df_finale.to_excel(filename, index=False)
-
-formatta_excel(filename, len(df_aperti), len(df_ns), len(df_scaduti))
-
-print(f"\n✅ File Excel salvato e formattato!")
-print(f"   Aperti: {len(df_aperti)} | Non specificati: {len(df_ns)} | Scaduti: {len(df_scaduti)}")
-print(f"\nCompletato: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-print("=" * 50)
-
-print("=" * 50)
-print("LUMEN SCOUT — MONITOR BANDI")
-print(f"Avvio: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-print("=" * 50)
-
-print("\nScaricando bandi da Invitalia...")
-bandi_invitalia = scrapa_invitalia()
-print(f"  → {len(bandi_invitalia)} bandi trovati")
-
-print("Scaricando bandi da Regione Campania...")
-bandi_campania = scrapa_regione_campania()
-print(f"  → {len(bandi_campania)} bandi trovati")
-
-print("Scaricando bandi da GAL Cilento...")
-bandi_gal = scrapa_gal_cilento()
-print(f"  → {len(bandi_gal)} bandi trovati")
-
-print("Scaricando bandi da portale UE...")
-bandi_ue = scrapa_bandi_ue()
-print(f"  → {len(bandi_ue)} bandi trovati")
-
-tutti_i_bandi = bandi_invitalia + bandi_campania + bandi_gal + bandi_ue + bandi_incentivi
+tutti_i_bandi = bandi_invitalia + bandi_campania + bandi_gal + bandi_incentivi + bandi_ue
 print(f"\nTotale bandi raccolti: {len(tutti_i_bandi)}")
 
 df = pd.DataFrame(tutti_i_bandi)
@@ -519,14 +477,11 @@ df_finale = pd.concat([df_aperti, df_ns, df_scaduti]).drop(columns=["_data_ord"]
 
 filename = "bandi_campania.xlsx"
 df_finale.to_excel(filename, index=False)
-
 formatta_excel(filename, len(df_aperti), len(df_ns), len(df_scaduti))
 
-# Filtra bandi pubblicati nelle ultime 48 ore
-from datetime import timedelta
+# Notifica email bandi nuovi (pubblicati nelle ultime 48 ore)
 oggi = datetime.today()
 limite = oggi - timedelta(hours=48)
-
 bandi_aperti_lista = df_aperti.to_dict("records")
 bandi_nuovi = []
 
@@ -540,12 +495,12 @@ for b in bandi_aperti_lista:
         except:
             pass
 
-# Invia email se ci sono nuovi bandi
 if bandi_nuovi:
     print(f"\n📧 Trovati {len(bandi_nuovi)} bandi pubblicati nelle ultime 48h — invio email...")
     invia_email_bandi(bandi_nuovi, len(df_aperti))
 else:
     print("\n📭 Nessun nuovo bando pubblicato nelle ultime 48 ore.")
+
 print(f"\n✅ File Excel salvato con analisi AI!")
 print(f"   Aperti: {len(df_aperti)} | Non specificati: {len(df_ns)} | Scaduti: {len(df_scaduti)}")
 print(f"\nCompletato: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
