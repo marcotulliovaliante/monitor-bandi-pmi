@@ -32,22 +32,27 @@ def analizza_bando_con_claude(titolo, fonte, scadenza):
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         messaggio = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
+            model="claude-sonnet-4-6",
+            max_tokens=300,
             messages=[{
                 "role": "user",
-                "content": f"""Analizza questo bando per una PMI in Campania.
+                "content": f"""Analizza questo bando per una PMI in Campania, con particolare attenzione al territorio del Cilento.
 Titolo: {titolo}
 Fonte: {fonte}
+Scadenza: {scadenza}
 
 Rispondi SOLO con questo JSON, niente altro:
 {{"pertinenza": "Alta", "categoria": "Formazione", "motivazione": "esempio"}}
 
-Sostituisci i valori con la tua analisi. Pertinenza può essere Alta, Media o Bassa."""
+Istruzioni:
+- "pertinenza": Alta, Media o Bassa, in base a quanto il bando è concretamente accessibile e utile per una PMI di piccola/media dimensione.
+- "categoria": una sola etichetta sintetica (es. Formazione, Innovazione, Internazionalizzazione, Sostenibilità, Digitalizzazione, Turismo, Agricoltura, Credito/Finanza, Infrastrutture, Altro).
+- "motivazione": 1-2 frasi concrete che spieghino perché una PMI dovrebbe interessarsi, citando se utile il tipo di spesa finanziabile o il settore beneficiario. Evita frasi generiche come "potrebbe essere utile"."""
             }]
         )
         testo = messaggio.content[0].text.strip()
         match = re.search(r'\{.*\}', testo, re.DOTALL)
+
         if match:
             return json.loads(match.group())
         return {"pertinenza": "N/D", "categoria": "N/D", "motivazione": testo[:100]}
