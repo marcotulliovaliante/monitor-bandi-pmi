@@ -4,3 +4,4 @@ openpyxl
 requests
 anthropic
 beautifulsoup4
+python-docx
