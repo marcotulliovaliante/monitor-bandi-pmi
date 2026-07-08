@@ -33,31 +33,55 @@ def analizza_bando_con_claude(titolo, fonte, scadenza):
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         messaggio = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=300,
+            max_tokens=500,
             messages=[{
                 "role": "user",
-                "content": f"""Analizza questo bando per una PMI in Campania, con particolare attenzione al territorio del Cilento.
+                "content": f"""Analizza questo bando pubblico italiano. Rispondi SOLO con un oggetto JSON valido, niente altro.
+
 Titolo: {titolo}
 Fonte: {fonte}
 Scadenza: {scadenza}
 
-Rispondi SOLO con questo JSON, niente altro:
-{{"pertinenza": "Alta", "categoria": "Formazione", "motivazione": "esempio"}}
+Struttura JSON richiesta:
+{{
+  "tipo_beneficiario": "...",
+  "settore_ateco": "...",
+  "settore_ets": "...",
+  "fascia_demografica_target": "...",
+  "qualita_bando": "...",
+  "motivazione": "..."
+}}
 
-Istruzioni:
-- "pertinenza": Alta, Media o Bassa, in base a quanto il bando è concretamente accessibile e utile per una PMI di piccola/media dimensione.
-- "categoria": una sola etichetta sintetica (es. Formazione, Innovazione, Internazionalizzazione, Sostenibilità, Digitalizzazione, Turismo, Agricoltura, Credito/Finanza, Infrastrutture, Altro).
-- "motivazione": 1-2 frasi concrete che spieghino perché una PMI dovrebbe interessarsi, citando se utile il tipo di spesa finanziabile o il settore beneficiario. Evita frasi generiche come "potrebbe essere utile"."""
+Istruzioni per ogni campo:
+
+"tipo_beneficiario": Chi può accedere al bando. Scegli UNO o PIÙ tra: Aziende, Enti Locali, Terzo Settore, Privati. Se più categorie, separale con " | " (es. "Aziende | Terzo Settore"). Se non determinabile: "N/D".
+
+"settore_ateco": Compilare SOLO se tipo_beneficiario include "Aziende". Scegli la sezione ATECO 2025 più pertinente tra: A-Agricoltura, B-Estrazione, C-Manifatturiero, D-Energia, E-Ambiente, F-Costruzioni, G-Commercio, H-Trasporti, I-Turismo/Ristorazione, J-Comunicazione, K-Finanza, L-Immobiliare, M-Professionale, N-Amministrativo, O-PA, P-Istruzione, Q-Sanità, R-Arte/Sport, S-Altri servizi, T-Famiglie, U-Organizzazioni internazionali. Se non applicabile o non determinabile: "N/A".
+
+"settore_ets": Compilare SOLO se tipo_beneficiario include "Terzo Settore". Scegli tra le attività art. 5 CTS: Assistenza sociale, Assistenza sanitaria, Educazione/istruzione, Tutela ambiente, Protezione civile, Cultura/arte, Tutela diritti, Ricerca scientifica, Sport dilettantistico, Cooperazione internazionale, Inclusione sociale, Agricoltura sociale, Attività commerciali ETS. Se non applicabile: "N/A".
+
+"fascia_demografica_target": Compilare SOLO se tipo_beneficiario include "Enti Locali" E il bando ha soglie demografiche. Scegli tra: Fino a 5.000 abitanti, 5.001-15.000, 15.001-50.000, Oltre 50.000, Tutti i Comuni. Se non applicabile: "N/A".
+
+"qualita_bando": Valuta la qualità intrinseca e accessibilità del bando indipendentemente dal settore. Alta = dotazione rilevante, requisiti chiari, procedura semplice. Media = buon bando ma con complessità o requisiti restrittivi. Bassa = dotazione limitata, iter complesso, o requisiti molto selettivi. Scegli: Alta, Media, Bassa.
+
+"motivazione": 1-2 frasi concrete sul perché questo bando è rilevante per il territorio del Cilento/Campania, citando il tipo di spesa finanziabile o il beneficio principale. Evita frasi generiche."""
             }]
         )
         testo = messaggio.content[0].text.strip()
         match = re.search(r'\{.*\}', testo, re.DOTALL)
-
         if match:
             return json.loads(match.group())
-        return {"pertinenza": "N/D", "categoria": "N/D", "motivazione": testo[:100]}
+        return {
+            "tipo_beneficiario": "N/D", "settore_ateco": "N/A",
+            "settore_ets": "N/A", "fascia_demografica_target": "N/A",
+            "qualita_bando": "N/D", "motivazione": testo[:150]
+        }
     except Exception as e:
-        return {"pertinenza": "N/D", "categoria": "N/D", "motivazione": str(e)}
+        return {
+            "tipo_beneficiario": "N/D", "settore_ateco": "N/A",
+            "settore_ets": "N/A", "fascia_demografica_target": "N/A",
+            "qualita_bando": "N/D", "motivazione": str(e)
+        }
 
 BASE_URL_CAMPANIA = "https://agricoltura.regione.campania.it/"
 
@@ -302,13 +326,14 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
 
         righe = ""
         for b in bandi_nuovi[:20]:
-            pertinenza = b.get("Pertinenza PMI", "")
-            colore = "#166534" if pertinenza == "Alta" else "#92400e" if pertinenza == "Media" else "#6B7280"
+            qualita = b.get("Qualità Bando", "")
+            colore = "#166534" if qualita == "Alta" else "#92400e" if qualita == "Media" else "#6B7280"
             righe += f"""
             <tr>
                 <td style="padding:8px;border-bottom:1px solid #e5e7eb;">{b['Titolo'][:80]}</td>
                 <td style="padding:8px;border-bottom:1px solid #e5e7eb;">{b['Scadenza']}</td>
-                <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:{colore};font-weight:bold">{pertinenza}</td>
+                <td style="padding:8px;border-bottom:1px solid #e5e7eb;">{b.get('Tipo Beneficiario', 'N/D')}</td>
+                <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:{colore};font-weight:bold">{qualita}</td>
                 <td style="padding:8px;border-bottom:1px solid #e5e7eb;">{b['Fonte']}</td>
             </tr>"""
 
@@ -326,7 +351,8 @@ def invia_email_bandi(bandi_nuovi, totale_aperti):
                     <tr style="background:#0F6E56;color:white">
                         <th style="padding:10px;text-align:left">Titolo</th>
                         <th style="padding:10px;text-align:left">Scadenza</th>
-                        <th style="padding:10px;text-align:left">Pertinenza</th>
+                        <th style="padding:10px;text-align:left">Beneficiari</th>
+                        <th style="padding:10px;text-align:left">Qualità</th>
                         <th style="padding:10px;text-align:left">Fonte</th>
                     </tr>
                     {righe}
@@ -447,8 +473,11 @@ df["_data_ord"] = df["Scadenza"].apply(parse_data)
 
 # Analisi AI solo sui bandi aperti
 print("\nAnalisi AI dei bandi aperti con Claude...")
-pertinenza_list = []
-categoria_list = []
+tipo_beneficiario_list = []
+settore_ateco_list = []
+settore_ets_list = []
+fascia_demografica_list = []
+qualita_bando_list = []
 motivazione_list = []
 
 aperti_mask = df["Stato"] == "✅ Aperto"
@@ -459,21 +488,30 @@ for i, (idx, row) in enumerate(df.iterrows()):
         if i % 10 == 0:
             print(f"  Analizzando bando {i+1}/{totale_aperti}...")
         analisi = analizza_bando_con_claude(row["Titolo"], row["Fonte"], row["Scadenza"])
-        pertinenza_list.append(analisi.get("pertinenza", "N/D"))
-        categoria_list.append(analisi.get("categoria", "N/D"))
+        tipo_beneficiario_list.append(analisi.get("tipo_beneficiario", "N/D"))
+        settore_ateco_list.append(analisi.get("settore_ateco", "N/A"))
+        settore_ets_list.append(analisi.get("settore_ets", "N/A"))
+        fascia_demografica_list.append(analisi.get("fascia_demografica_target", "N/A"))
+        qualita_bando_list.append(analisi.get("qualita_bando", "N/D"))
         motivazione_list.append(analisi.get("motivazione", "N/D"))
     else:
-        pertinenza_list.append("")
-        categoria_list.append("")
+        tipo_beneficiario_list.append("")
+        settore_ateco_list.append("")
+        settore_ets_list.append("")
+        fascia_demografica_list.append("")
+        qualita_bando_list.append("")
         motivazione_list.append("")
 
-df["Pertinenza PMI"] = pertinenza_list
-df["Categoria"] = categoria_list
+df["Tipo Beneficiario"] = tipo_beneficiario_list
+df["Settore ATECO"] = settore_ateco_list
+df["Settore ETS"] = settore_ets_list
+df["Fascia Demografica"] = fascia_demografica_list
+df["Qualità Bando"] = qualita_bando_list
 df["Motivazione AI"] = motivazione_list
 
 df_aperti = df[df["Stato"] == "✅ Aperto"].sort_values(
-    ["Pertinenza PMI", "_data_ord"],
-    key=lambda x: x.map({"Alta": 0, "Media": 1, "Bassa": 2}) if x.name == "Pertinenza PMI" else x
+    ["Qualità Bando", "_data_ord"],
+    key=lambda x: x.map({"Alta": 0, "Media": 1, "Bassa": 2}) if x.name == "Qualità Bando" else x
 )
 df_ns = df[df["Stato"] == "Non specificata"]
 df_scaduti = df[df["Stato"] == "❌ Scaduto"].sort_values("_data_ord", ascending=False)

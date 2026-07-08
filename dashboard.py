@@ -53,11 +53,21 @@ try:
     fonte_sel = st.sidebar.selectbox("Fonte", fonti)
     stati = ["Tutti"] + sorted(df["Stato"].unique().tolist())
     stato_sel = st.sidebar.selectbox("Stato", stati)
-    if "Pertinenza PMI" in df.columns:
-        pertinenze = ["Tutte"] + sorted(df["Pertinenza PMI"].dropna().unique().tolist())
-        pertinenza_sel = st.sidebar.selectbox("Pertinenza PMI", pertinenze)
+
+    # Filtro Tipo Beneficiario (nuovo)
+    if "Tipo Beneficiario" in df.columns:
+        tipi = ["Tutti"] + sorted(df["Tipo Beneficiario"].dropna().replace("", pd.NA).dropna().unique().tolist())
+        tipo_sel = st.sidebar.selectbox("Tipo Beneficiario", tipi)
     else:
-        pertinenza_sel = "Tutte"
+        tipo_sel = "Tutti"
+
+    # Filtro Qualità Bando (sostituisce Pertinenza PMI)
+    if "Qualità Bando" in df.columns:
+        qualita_opts = ["Tutte", "Alta", "Media", "Bassa"]
+        qualita_sel = st.sidebar.selectbox("Qualità Bando", qualita_opts)
+    else:
+        qualita_sel = "Tutte"
+
     cerca = st.sidebar.text_input("🔍 Cerca nel titolo")
 
     df_filtrato = df.copy()
@@ -65,8 +75,10 @@ try:
         df_filtrato = df_filtrato[df_filtrato["Fonte"] == fonte_sel]
     if stato_sel != "Tutti":
         df_filtrato = df_filtrato[df_filtrato["Stato"] == stato_sel]
-    if pertinenza_sel != "Tutte" and "Pertinenza PMI" in df.columns:
-        df_filtrato = df_filtrato[df_filtrato["Pertinenza PMI"] == pertinenza_sel]
+    if tipo_sel != "Tutti" and "Tipo Beneficiario" in df.columns:
+        df_filtrato = df_filtrato[df_filtrato["Tipo Beneficiario"].str.contains(tipo_sel, na=False)]
+    if qualita_sel != "Tutte" and "Qualità Bando" in df.columns:
+        df_filtrato = df_filtrato[df_filtrato["Qualità Bando"] == qualita_sel]
     if cerca:
         df_filtrato = df_filtrato[df_filtrato["Titolo"].str.contains(cerca, case=False, na=False)]
 
@@ -145,21 +157,19 @@ try:
 
     st.subheader(f"Bandi trovati: {len(df_filtrato)}")
 
-    colonne_principali = ["Titolo", "Scadenza", "Fonte"]
-    if "Pertinenza PMI" in df.columns:
-        colonne_principali.append("Pertinenza PMI")
-    if "Link" in df.columns:
-        colonne_principali.append("Link")
+    colonne_principali = ["Titolo", "Scadenza", "Tipo Beneficiario", "Qualità Bando", "Fonte", "Link"]
+    colonne_presenti = [c for c in colonne_principali if c in df_filtrato.columns]
 
     st.dataframe(
-        df_filtrato[colonne_principali],
+        df_filtrato[colonne_presenti],
         use_container_width=True,
         hide_index=True,
         column_config={
             "Titolo": st.column_config.TextColumn("Titolo", width="large"),
             "Scadenza": st.column_config.TextColumn("Scadenza", width="medium"),
+            "Tipo Beneficiario": st.column_config.TextColumn("Beneficiari", width="medium"),
+            "Qualità Bando": st.column_config.TextColumn("Qualità", width="small"),
             "Fonte": st.column_config.TextColumn("Fonte", width="medium"),
-            "Pertinenza PMI": st.column_config.TextColumn("Pertinenza", width="small"),
             "Link": st.column_config.LinkColumn("🔗", width="small", display_text="Apri"),
         }
     )
@@ -178,11 +188,17 @@ try:
             st.markdown(f"**Scadenza:** {bando['Scadenza']}")
             if "Data pubblicazione" in bando:
                 st.markdown(f"**Data pubblicazione:** {bando['Data pubblicazione']}")
+            if "Tipo Beneficiario" in bando:
+                st.markdown(f"**Tipo Beneficiario:** {bando['Tipo Beneficiario']}")
         with col2:
-            if "Pertinenza PMI" in bando:
-                st.markdown(f"**Pertinenza PMI:** {bando['Pertinenza PMI']}")
-            if "Categoria" in bando:
-                st.markdown(f"**Categoria:** {bando['Categoria']}")
+            if "Qualità Bando" in bando:
+                st.markdown(f"**Qualità Bando:** {bando['Qualità Bando']}")
+            if "Settore ATECO" in bando and bando["Settore ATECO"] not in ["N/A", "", None]:
+                st.markdown(f"**Settore ATECO:** {bando['Settore ATECO']}")
+            if "Settore ETS" in bando and bando["Settore ETS"] not in ["N/A", "", None]:
+                st.markdown(f"**Settore ETS:** {bando['Settore ETS']}")
+            if "Fascia Demografica" in bando and bando["Fascia Demografica"] not in ["N/A", "", None]:
+                st.markdown(f"**Fascia Demografica:** {bando['Fascia Demografica']}")
             if "Motivazione AI" in bando:
                 st.markdown(f"**Analisi AI:** {bando['Motivazione AI']}")
             if "Link" in bando and bando["Link"]:
