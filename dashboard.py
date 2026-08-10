@@ -481,5 +481,369 @@ try:
                 mime="text/csv"
             )
 
+    # ── Genera Scheda Tecnica da PDF ─────────────────────────────────────────
+    if st.session_state.ruolo == "admin":
+        st.divider()
+        st.subheader("📋 Genera Scheda Tecnica da PDF")
+        st.caption("Carica il PDF del bando (o più PDF) e Claude genera una Scheda Tecnica dettagliata in formato Lumen.")
+
+        titolo_scheda = st.text_input(
+            "Titolo del bando",
+            placeholder="Es. SRD06 Azione 1 — Investimenti per la Prevenzione del Potenziale Produttivo Agricolo"
+        )
+        fonte_scheda = st.text_input(
+            "Ente promotore / Fonte",
+            placeholder="Es. Regione Campania — Agricoltura · CSR 2023-2027"
+        )
+        pdf_files = st.file_uploader(
+            "Carica PDF del bando",
+            type=["pdf"],
+            accept_multiple_files=True,
+            help="Puoi caricare più file PDF (es. bando principale + allegati). Verranno letti tutti."
+        )
+
+        col_btn_scheda, col_info_scheda = st.columns([2, 5])
+        with col_btn_scheda:
+            genera_scheda_btn = st.button(
+                "📋 Genera Scheda Tecnica",
+                type="primary",
+                use_container_width=True,
+                disabled=(not pdf_files or not titolo_scheda)
+            )
+        with col_info_scheda:
+            st.caption("Claude legge i PDF caricati ed estrae tutti i dati per generare la Scheda Tecnica. Operazione: ~45-60 secondi.")
+
+        if genera_scheda_btn and pdf_files and titolo_scheda:
+            with st.spinner("⏳ Claude sta leggendo i documenti e generando la Scheda Tecnica..."):
+                try:
+                    import base64
+
+                    # Prepara i documenti PDF per Claude
+                    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+                    client = anthropic.Anthropic(api_key=api_key)
+
+                    # Costruisce il contenuto del messaggio con tutti i PDF
+                    content = []
+                    for pdf_file in pdf_files:
+                        pdf_bytes = pdf_file.read()
+                        pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+                        content.append({
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_b64
+                            }
+                        })
+
+                    # Prompt estrazione dati strutturati
+                    content.append({
+                        "type": "text",
+                        "text": f"""Sei un esperto di bandi pubblici italiani. Analizza attentamente il/i documento/i PDF allegati e restituisci SOLO un oggetto JSON valido con i dati strutturati richiesti. Nessun testo prima o dopo il JSON.
+
+TITOLO BANDO: {titolo_scheda}
+FONTE: {fonte_scheda if fonte_scheda else "Da determinare dal documento"}
+
+Struttura JSON richiesta:
+{{
+  "ente_promotore": "es. Regione Campania — Agricoltura · CSR Campania 2023-2027 · DRD n. XXX del GG/MM/AAAA",
+  "riferimento_normativo": "es. DRD n. 329 del 04/08/2026 — PSP PAC 2023-2027",
+  "hero_tag": "riga descrittiva breve per l'header (programma, fonte, decreto)",
+  "hero_subtitle": "sottotitolo descrittivo del bando (max 20 parole)",
+  "dotazione": "es. € 5.000.000",
+  "aliquota": "es. 70%",
+  "forma_sostegno": "es. Fondo Perduto / Finanziamento agevolato / Misto",
+  "apertura": "es. 06/08/2026",
+  "scadenza": "es. 12/10/2026",
+  "finalita": "2-3 frasi che descrivono obiettivi e finalità del bando",
+  "beneficiari": ["beneficiario 1", "beneficiario 2", "..."],
+  "requisiti_ammissibilita": ["requisito 1", "requisito 2", "..."],
+  "spesa_minima": "es. € 20.000",
+  "spesa_massima": "es. € 220.000",
+  "anticipo": "es. Fino al 50% previo fideiussione bancaria — oppure N/D se non previsto",
+  "durata_progetto": "es. 12 mesi dalla concessione",
+  "opere_finanziabili": [
+    {{"categoria": "nome categoria", "descrizione": "descrizione interventi ammissibili", "spese": "tipologie di spesa ammissibili"}}
+  ],
+  "spese_non_ammissibili": ["spesa 1", "spesa 2", "..."],
+  "competenza_territoriale": "descrizione dell'ambito territoriale di applicazione",
+  "modalita_presentazione": "come si presenta la domanda, portale, strumenti richiesti",
+  "documentazione_richiesta": ["documento 1", "documento 2", "..."],
+  "scadenze_dettaglio": [
+    {{"label": "Apertura sportello", "value": "data/modalità"}},
+    {{"label": "Chiusura sportello", "value": "data/ora"}},
+    {{"label": "Modalità presentazione", "value": "dettaglio"}},
+    {{"label": "Durata realizzazione", "value": "dettaglio"}}
+  ],
+  "criteri_selezione": [
+    {{"principio": "nome principio", "descrizione": "criterio e punteggi", "punti": 30}}
+  ],
+  "punteggio_minimo": "es. 35 su 100 — oppure N/D se non specificato",
+  "nota_territoriale": "eventuali vantaggi o specificità territoriali rilevanti per il Cilento/Campania",
+  "contatto_nome": "es. Giovanni Padovano",
+  "contatto_email": "es. giovanni.padovano@regione.campania.it",
+  "contatto_tel": "es. 081-7967461",
+  "contatto_ente": "es. Direzione Generale Agricoltura — Settore 207.00.00",
+  "riferimenti_normativi": ["riferimento 1", "riferimento 2", "..."],
+  "portali": ["es. SIAN: sian.agea.gov.it", "es. SIARC: siarc.regione.campania.it"],
+  "note_aggiuntive": "eventuali informazioni importanti non coperte dalle sezioni precedenti — lascia vuoto se non necessario"
+}}
+
+Se un dato non è disponibile nel documento usa "N/D". Per i criteri di selezione con punteggi usa numeri interi."""
+                    })
+
+                    risposta = client.messages.create(
+                        model="claude-sonnet-4-6",
+                        max_tokens=4000,
+                        messages=[{"role": "user", "content": content}]
+                    )
+
+                    testo_json = risposta.content[0].text.strip()
+                    match = re.search(r'\{.*\}', testo_json, re.DOTALL)
+                    if not match:
+                        raise ValueError("Claude non ha restituito un JSON valido")
+                    dati = json.loads(match.group())
+
+                    # Genera HTML Scheda Tecnica
+                    def build_list(items):
+                        if not items:
+                            return "<li>N/D</li>"
+                        return "".join(f"<li>{i}</li>" for i in items if i and i != "N/D")
+
+                    def build_opere(opere):
+                        if not opere:
+                            return "<tr><td colspan='3'>N/D</td></tr>"
+                        rows = ""
+                        for o in opere:
+                            rows += f"<tr><td><strong>{o.get('categoria','')}</strong></td><td>{o.get('descrizione','')}</td><td>{o.get('spese','')}</td></tr>"
+                        return rows
+
+                    def build_criteri(criteri):
+                        if not criteri:
+                            return "<tr><td colspan='3'>N/D</td></tr>"
+                        rows = ""
+                        for c in criteri:
+                            rows += f"<tr><td><strong>{c.get('principio','')}</strong></td><td>{c.get('descrizione','')}</td><td style='text-align:center'><strong>{c.get('punti','')}</strong></td></tr>"
+                        return rows
+
+                    def build_scadenze(scadenze):
+                        if not scadenze:
+                            return ""
+                        rows = ""
+                        for s in scadenze:
+                            rows += f"<tr><td><strong>{s.get('label','')}</strong></td><td>{s.get('value','')}</td></tr>"
+                        return rows
+
+                    nota_territoriale_html = ""
+                    if dati.get("nota_territoriale") and dati["nota_territoriale"] not in ("N/D", ""):
+                        nota_territoriale_html = f'<div class="highlight"><strong>📍 Nota territoriale:</strong> {dati["nota_territoriale"]}</div>'
+
+                    note_html = ""
+                    if dati.get("note_aggiuntive") and dati["note_aggiuntive"] not in ("N/D", ""):
+                        note_html = f'<div class="alert"><strong>Note aggiuntive:</strong> {dati["note_aggiuntive"]}</div>'
+
+                    criteri_html = build_criteri(dati.get("criteri_selezione", []))
+                    punteggio_minimo = dati.get("punteggio_minimo", "N/D")
+                    punteggio_html = f'<p>Punteggio minimo per l\'ammissione al finanziamento: <strong>{punteggio_minimo}</strong></p>' if punteggio_minimo != "N/D" else ""
+
+                    html_scheda = f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>{titolo_scheda} — Scheda Tecnica | Lumen Advisors</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *{{margin:0;padding:0;box-sizing:border-box}}
+  :root{{--vn:#0a2e22;--vs:#0F6E56;--oro:#C9A84C;--oc:#e8d5a3;--bg:#f7f7f5;--gt:#555555;--txt:#1a1a1a;--wh:#ffffff}}
+  body{{font-family:'Montserrat',sans-serif;background:var(--wh);color:var(--txt);width:210mm;margin:0 auto;font-size:13px}}
+  .header{{background:var(--vn);padding:16px 24px 14px;display:flex;justify-content:space-between;align-items:center}}
+  .logo-wrap{{display:flex;align-items:center;gap:12px}}
+  .logo-top{{font-size:18px;font-weight:800;letter-spacing:3px;color:var(--wh);line-height:1}}
+  .logo-sub{{font-size:8.5px;letter-spacing:2px;color:var(--oc);text-transform:uppercase;margin-top:3px}}
+  .header-badge{{border:1.5px solid var(--oro);color:var(--oro);font-size:9.5px;font-weight:700;letter-spacing:1.5px;padding:6px 14px;text-transform:uppercase}}
+  .hero{{background:var(--vn);padding:6px 24px 20px;border-bottom:3px solid var(--oro)}}
+  .hero-tag{{font-size:9px;font-weight:600;letter-spacing:2px;color:var(--oro);text-transform:uppercase;margin-bottom:6px}}
+  .hero-title{{font-size:20px;font-weight:800;color:var(--wh);text-transform:uppercase;line-height:1.2}}
+  .hero-subtitle{{font-family:'Cormorant Garamond',serif;font-size:14px;font-style:italic;color:var(--oc);margin-top:6px}}
+  .hero-meta{{display:flex;gap:28px;margin-top:14px;flex-wrap:wrap}}
+  .hero-meta-label{{font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--oc);opacity:.8}}
+  .hero-meta-value{{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--oro);line-height:1.1}}
+  .body{{padding:18px 24px}}
+  .section-label{{font-size:9.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--vs);border-bottom:1.5px solid var(--oro);padding-bottom:5px;margin:20px 0 10px}}
+  .section-label:first-child{{margin-top:0}}
+  .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px}}
+  .three-col{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:6px}}
+  .card{{border:1px solid #e0e0e0;padding:12px 14px;background:var(--wh)}}
+  .card-dark{{background:var(--vn);padding:12px 14px;text-align:center}}
+  .card-label{{font-size:8.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--vs);margin-bottom:5px}}
+  .card-value{{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--vn);line-height:1.1}}
+  .card-dark .card-label{{color:var(--oc);opacity:.8}}
+  .card-dark .card-value{{color:var(--oro)}}
+  .card-note{{font-size:10px;color:var(--gt);margin-top:4px}}
+  .card-dark .card-note{{color:var(--oc);opacity:.7}}
+  p{{font-size:12px;line-height:1.7;color:var(--txt);margin-bottom:8px}}
+  p:last-child{{margin-bottom:0}}
+  p strong{{color:var(--vn)}}
+  ul.lumen{{list-style:none;padding:0}}
+  ul.lumen li{{font-size:12px;line-height:1.6;padding:3px 0 3px 16px;position:relative;color:var(--txt)}}
+  ul.lumen li::before{{content:"•";position:absolute;left:0;color:var(--oro);font-size:14px;line-height:1.3}}
+  ul.lumen li strong{{color:var(--vn);font-weight:700}}
+  table.lumen{{width:100%;border-collapse:collapse;font-size:11.5px}}
+  table.lumen th{{background:var(--vn);color:var(--wh);padding:8px 10px;text-align:left;font-weight:700;font-size:9.5px;letter-spacing:.5px}}
+  table.lumen td{{padding:7px 10px;border-bottom:1px solid #e8e8e8;vertical-align:top;line-height:1.5}}
+  table.lumen tr:nth-child(even) td{{background:var(--bg)}}
+  table.lumen td strong{{color:var(--vn);font-weight:700}}
+  .highlight{{background:var(--bg);border-left:4px solid var(--oro);padding:10px 14px;margin:8px 0;font-size:12px;line-height:1.7}}
+  .highlight strong{{color:var(--vn);font-weight:700}}
+  .alert{{background:#fff8e6;border-left:4px solid var(--oro);padding:8px 14px;font-size:11px;line-height:1.6;color:var(--gt);margin-top:8px}}
+  .alert strong{{color:var(--vn)}}
+  .cta{{background:var(--vn);margin-top:20px;padding:14px 24px;display:flex;justify-content:space-between;align-items:center}}
+  .cta-title{{font-size:13px;font-weight:700;color:var(--wh);margin-bottom:4px}}
+  .cta-desc{{font-size:10px;color:var(--oc);line-height:1.6}}
+  .cta-right{{text-align:right;flex-shrink:0;margin-left:20px}}
+  .cta-right p{{font-size:10.5px;color:var(--oro);line-height:2}}
+  .page-footer{{display:flex;justify-content:space-between;align-items:center;padding:10px 24px;border-top:1px solid #e0e0e0;margin-top:8px}}
+  .pf-name{{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--vn);text-transform:uppercase}}
+  .pf-sub{{font-size:7.5px;color:var(--gt);letter-spacing:1.5px;text-transform:uppercase}}
+  .pf-right{{font-size:9px;color:var(--vs)}}
+  @media print{{body{{width:210mm}}.header,.hero,.cta,.card-dark{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}table.lumen th{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-wrap">
+    <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+      <polygon points="20,2 38,20 20,38 2,20" fill="none" stroke="#C9A84C" stroke-width="2"/>
+      <polygon points="20,8 32,20 20,32 8,20" fill="none" stroke="#C9A84C" stroke-width="1"/>
+      <polygon points="20,14 26,20 20,26 14,20" fill="#C9A84C"/>
+    </svg>
+    <div><div class="logo-top">LUMEN</div><div class="logo-sub">Advisors · Advisory · Planning · Wealth</div></div>
+  </div>
+  <div class="header-badge">Scheda Tecnica Bando</div>
+</div>
+
+<div class="hero">
+  <div class="hero-tag">{dati.get("hero_tag", dati.get("ente_promotore", fonte_scheda))}</div>
+  <div class="hero-title">{titolo_scheda}</div>
+  <div class="hero-subtitle">{dati.get("hero_subtitle", "")}</div>
+  <div class="hero-meta">
+    <div><div class="hero-meta-label">Dotazione Totale</div><div class="hero-meta-value">{dati.get("dotazione","N/D")}</div></div>
+    <div><div class="hero-meta-label">Aliquota Sostegno</div><div class="hero-meta-value">{dati.get("aliquota","N/D")}</div></div>
+    <div><div class="hero-meta-label">Apertura Sportello</div><div class="hero-meta-value">{dati.get("apertura","N/D")}</div></div>
+    <div><div class="hero-meta-label">Scadenza Domande</div><div class="hero-meta-value">{dati.get("scadenza","N/D")}</div></div>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="section-label">1. Finalità e Obiettivi</div>
+  <p>{dati.get("finalita","N/D")}</p>
+
+  <div class="section-label">2. Beneficiari e Requisiti di Ammissibilità</div>
+  <div class="two-col">
+    <div>
+      <p style="font-size:10.5px;font-weight:700;color:var(--vn);margin-bottom:6px">CHI PUÒ CANDIDARSI</p>
+      <ul class="lumen">{build_list(dati.get("beneficiari",[]))}</ul>
+    </div>
+    <div>
+      <p style="font-size:10.5px;font-weight:700;color:var(--vn);margin-bottom:6px">REQUISITI DI AMMISSIBILITÀ</p>
+      <ul class="lumen">{build_list(dati.get("requisiti_ammissibilita",[]))}</ul>
+    </div>
+  </div>
+
+  <div class="section-label">3. Opere Finanziabili</div>
+  <table class="lumen">
+    <tr><th>Categoria</th><th>Descrizione Interventi</th><th>Spese Ammissibili</th></tr>
+    {build_opere(dati.get("opere_finanziabili",[]))}
+  </table>
+  {f'<div class="alert"><strong>Spese non ammissibili:</strong> {", ".join(dati.get("spese_non_ammissibili",[]))}</div>' if dati.get("spese_non_ammissibili") else ""}
+
+  <div class="section-label">4. Importi e Struttura dell'Agevolazione</div>
+  <div class="three-col">
+    <div class="card-dark"><div class="card-label">Dotazione Totale</div><div class="card-value">{dati.get("dotazione","N/D")}</div><div class="card-note">{dati.get("forma_sostegno","")}</div></div>
+    <div class="card-dark"><div class="card-label">Aliquota di Sostegno</div><div class="card-value">{dati.get("aliquota","N/D")}</div><div class="card-note">Sovvenzione in conto capitale</div></div>
+    <div class="card-dark"><div class="card-label">Forma del Sostegno</div><div class="card-value">{dati.get("forma_sostegno","N/D")}</div><div class="card-note">&nbsp;</div></div>
+  </div>
+  <div class="two-col" style="margin-top:10px">
+    <div class="card"><div class="card-label">Spesa Minima Ammissibile</div><div class="card-value">{dati.get("spesa_minima","N/D")}</div><div class="card-note">Per singola operazione</div></div>
+    <div class="card"><div class="card-label">Spesa Massima Ammissibile</div><div class="card-value">{dati.get("spesa_massima","N/D")}</div><div class="card-note">Per singola operazione</div></div>
+  </div>
+  {f'<div class="highlight" style="margin-top:10px"><strong>Anticipo:</strong> {dati.get("anticipo","")}</div>' if dati.get("anticipo","") not in ("N/D","") else ""}
+
+  <div class="section-label">5. Competenza Territoriale</div>
+  <div class="highlight">{dati.get("competenza_territoriale","N/D")}</div>
+  {nota_territoriale_html}
+
+  <div class="section-label">6. Scadenze e Modalità di Presentazione</div>
+  <table class="lumen">
+    <tr><th style="width:32%">Adempimento</th><th>Dettaglio</th></tr>
+    {build_scadenze(dati.get("scadenze_dettaglio",[]))}
+  </table>
+  {f'<div class="alert" style="margin-top:8px"><strong>Documentazione richiesta:</strong> {", ".join(dati.get("documentazione_richiesta",[]))}</div>' if dati.get("documentazione_richiesta") else ""}
+
+  <div class="section-label">7. Criteri di Selezione</div>
+  {punteggio_html}
+  <table class="lumen" style="margin-top:8px">
+    <tr><th style="width:28%">Principio</th><th>Criterio e Punteggio</th><th style="text-align:center;width:12%">Max Punti</th></tr>
+    {criteri_html}
+  </table>
+  {note_html}
+
+  <div class="section-label">8. Contatti e Riferimenti</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Responsabile dell'Intervento</div>
+      <div style="font-size:13px;font-weight:700;color:var(--vn);margin:4px 0 2px">{dati.get("contatto_nome","N/D")}</div>
+      <div style="font-size:11px;color:var(--gt);margin-bottom:2px">{dati.get("contatto_email","")}</div>
+      <div style="font-size:11px;color:var(--gt);margin-bottom:6px">{dati.get("contatto_tel","")}</div>
+      <div style="font-size:10px;color:var(--gt)">{dati.get("contatto_ente","")}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Riferimenti Normativi e Portali</div>
+      <ul class="lumen" style="margin-top:4px">
+        {build_list(dati.get("riferimenti_normativi",[]) + dati.get("portali",[]))}
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<div class="cta">
+  <div>
+    <div class="cta-title">Lumen Advisors supporta la vostra candidatura</div>
+    <div class="cta-desc">Verifica di eligibilità · Strutturazione del progetto · Predisposizione della domanda · Monitoraggio e rendicontazione</div>
+  </div>
+  <div class="cta-right"><p>info@lumenadvisors.it</p><p>+41 79 601 5800</p><p>www.lumenadvisors.it</p></div>
+</div>
+
+<div class="page-footer">
+  <div style="display:flex;align-items:center;gap:8px">
+    <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+      <polygon points="20,2 38,20 20,38 2,20" fill="none" stroke="#C9A84C" stroke-width="2.5"/>
+      <polygon points="20,10 30,20 20,30 10,20" fill="#C9A84C"/>
+    </svg>
+    <div><div class="pf-name">Lumen Advisors</div><div class="pf-sub">Advisory · Planning · Wealth</div></div>
+  </div>
+  <div style="font-size:9px;font-style:italic;color:var(--gt)">Documento riservato · Uso esclusivo del destinatario</div>
+  <div class="pf-right">www.lumenadvisors.it</div>
+</div>
+
+</body></html>"""
+
+                    nome_file_scheda = titolo_scheda.lower().replace(" ", "_").replace("/", "-")[:50]
+                    st.success("✅ Scheda Tecnica generata!")
+                    st.download_button(
+                        label="⬇️ Scarica Scheda Tecnica HTML",
+                        data=html_scheda.encode("utf-8"),
+                        file_name=f"scheda_tecnica_{nome_file_scheda}_{datetime.now().strftime('%Y%m%d')}.html",
+                        mime="text/html",
+                        type="primary"
+                    )
+                    st.caption("Apri nel browser → Ctrl+P → Salva come PDF per la versione stampabile.")
+
+                except Exception as e:
+                    st.error(f"Errore nella generazione della Scheda Tecnica: {e}")
+
 except Exception as e:
     st.error(f"Errore nel caricamento dei dati: {e}")
