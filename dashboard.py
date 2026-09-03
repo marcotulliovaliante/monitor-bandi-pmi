@@ -589,7 +589,14 @@ Struttura JSON richiesta:
   "note_aggiuntive": "eventuali informazioni importanti non coperte dalle sezioni precedenti — lascia vuoto se non necessario"
 }}
 
-Se un dato non è disponibile nel documento usa "N/D". Per i criteri di selezione con punteggi usa numeri interi."""
+Se un dato non è disponibile nel documento usa "N/D". Per i criteri di selezione con punteggi usa numeri interi.
+
+REGOLE CRITICHE PER IL JSON:
+1. Usa SOLO virgolette doppie standard " per le stringhe, MAI virgolette singole o tipografiche
+2. Negli apostrofi nelle stringhe italiane (es. dell'impresa, l'azienda) usa la versione escaped: dell\\'impresa, l\\'azienda — OPPURE riformula senza apostrofo: "della impresa", "la azienda"
+3. Non usare mai virgolette tipografiche " " ' ' nel JSON
+4. Ogni stringa deve essere su una sola riga — no newline dentro le stringhe
+5. Verifica mentalmente che il JSON sia valido prima di restituirlo"""
                     })
 
                     risposta = client.messages.create(
@@ -602,7 +609,37 @@ Se un dato non è disponibile nel documento usa "N/D". Per i criteri di selezion
                     match = re.search(r'\{.*\}', testo_json, re.DOTALL)
                     if not match:
                         raise ValueError("Claude non ha restituito un JSON valido")
-                    dati = json.loads(match.group())
+                    json_str = match.group()
+
+                    # Pulizia aggressiva caratteri problematici
+                    import unicodedata
+                    json_clean = unicodedata.normalize("NFKC", json_str)
+                    # Virgolette tipografiche → standard
+                    for old, new in [('\u2018',"'"),('\u2019',"'"),('\u201a',"'"),
+                                     ('\u201c','"'),('\u201d','"'),('\u201e','"'),
+                                     ('\u2013','-'),('\u2014','-'),('\u2026','...'),
+                                     ('\u00e2\u0080\u0099',"'"),('\u00e2\u0080\u009c','"'),
+                                     ('\u00e2\u0080\u009d','"')]:
+                        json_clean = json_clean.replace(old, new)
+                    # Rimuovi newline dentro le stringhe JSON
+                    json_clean = re.sub(r'(?<=: ")([^"]*)\n([^"]*)"', r'\1 \2"', json_clean)
+
+                    try:
+                        dati = json.loads(json_clean)
+                    except json.JSONDecodeError:
+                        # Retry: chiedi a Claude di correggere
+                        retry = client.messages.create(
+                            model="claude-sonnet-4-6",
+                            max_tokens=4000,
+                            messages=[{
+                                "role": "user",
+                                "content": f"Questo JSON non è valido a causa di apostrofi o caratteri speciali. Correggilo sostituendo tutti gli apostrofi nelle stringhe con la versione escaped \\' e restituisci SOLO il JSON corretto, niente altro:\n\n{json_clean}"
+                            }]
+                        )
+                        json_retry = re.search(r'\{.*\}', retry.content[0].text.strip(), re.DOTALL)
+                        if not json_retry:
+                            raise ValueError("Impossibile correggere il JSON. Riprova con un PDF diverso.")
+                        dati = json.loads(json_retry.group())
 
                     # Genera HTML Scheda Tecnica
                     def build_list(items):
