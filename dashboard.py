@@ -585,38 +585,47 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON con questa struttura esatta. Per le s
                     risposta = client.messages.create(
                         model="claude-sonnet-4-6",
                         max_tokens=4000,
-                        messages=[
-                            {"role": "user", "content": content},
-                            {"role": "assistant", "content": "{"}
-                        ]
+                        messages=[{"role": "user", "content": content}]
                     )
 
-                    # Ricostruisce il JSON completo aggiungendo il { iniziale del prefill
-                    testo_raw = "{" + risposta.content[0].text.strip()
+                    # Estrai e pulisci il JSON dalla risposta
+                    testo_raw = risposta.content[0].text.strip()
+                    # Rimuovi eventuali blocchi markdown
+                    testo_raw = re.sub(r'```json\s*', '', testo_raw)
+                    testo_raw = re.sub(r'```\s*', '', testo_raw)
+                    # Trova il JSON
+                    match = re.search(r'\{.*\}', testo_raw, re.DOTALL)
+                    if not match:
+                        raise ValueError("Claude non ha restituito un JSON valido")
+                    json_str = match.group()
                     # Pulizia caratteri Unicode problematici
                     import unicodedata
-                    testo_raw = unicodedata.normalize("NFKC", testo_raw)
+                    json_str = unicodedata.normalize("NFKC", json_str)
                     for old, new in [('\u2018',"'"),('\u2019',"'"),('\u201a',"'"),
                                      ('\u201c','"'),('\u201d','"'),('\u201e','"'),
                                      ('\u2013','-'),('\u2014','-'),('\u2026','...')]:
-                        testo_raw = testo_raw.replace(old, new)
+                        json_str = json_str.replace(old, new)
+                    # Rimuovi escape invalidi (backslash non seguiti da " n t r \)
+                    json_str = re.sub(r'\\(?!["\\/nrtbf])', '', json_str)
 
                     try:
-                        dati = json.loads(testo_raw)
-                    except json.JSONDecodeError:
-                        # Retry chiedendo a Claude di correggere
+                        dati = json.loads(json_str)
+                    except json.JSONDecodeError as je:
+                        # Retry: chiedi a Claude di correggere il JSON
                         retry = client.messages.create(
                             model="claude-sonnet-4-6",
                             max_tokens=4000,
                             messages=[{
                                 "role": "user",
-                                "content": f"Questo JSON non e valido. Correggilo: sostituisci apostrofi con spazi, rimuovi escape non validi, assicurati che tutte le stringhe siano su una riga. Restituisci SOLO il JSON corretto:\n\n{testo_raw[:3000]}"
-                            }],
+                                "content": f"Il seguente testo dovrebbe essere JSON ma non e valido (errore: {je}). Riscrivilo come JSON valido: usa solo virgolette doppie, sostituisci gli apostrofi con spazi (es. 'dell impresa' invece di 'dell apostrofo impresa'), rimuovi tutti i backslash non necessari. Restituisci SOLO il JSON, niente altro.\n\n{json_str[:3000]}"
+                            }]
                         )
                         testo_retry = retry.content[0].text.strip()
+                        testo_retry = re.sub(r'```json\s*', '', testo_retry)
+                        testo_retry = re.sub(r'```\s*', '', testo_retry)
                         match_retry = re.search(r'\{.*\}', testo_retry, re.DOTALL)
                         if not match_retry:
-                            raise ValueError("Impossibile generare JSON valido. Riprova.")
+                            raise ValueError("Impossibile generare un JSON valido. Riprova.")
                         dati = json.loads(match_retry.group())
 
                     # Genera HTML Scheda Tecnica
