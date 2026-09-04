@@ -539,107 +539,85 @@ try:
                     # Prompt estrazione dati strutturati
                     content.append({
                         "type": "text",
-                        "text": f"""Sei un esperto di bandi pubblici italiani. Analizza attentamente il/i documento/i PDF allegati e restituisci SOLO un oggetto JSON valido con i dati strutturati richiesti. Nessun testo prima o dopo il JSON.
+                        "text": f"""Analizza il documento PDF allegato (bando pubblico italiano) ed estrai le informazioni richieste.
 
 TITOLO BANDO: {titolo_scheda}
 FONTE: {fonte_scheda if fonte_scheda else "Da determinare dal documento"}
 
-Struttura JSON richiesta:
+Restituisci ESCLUSIVAMENTE un oggetto JSON con questa struttura esatta. Per le stringhe: usa solo virgolette doppie, sostituisci gli apostrofi con uno spazio (es. "dell impresa" invece di "dell'impresa"), nessun carattere di escape. Se un dato manca usa "N/D".
+
 {{
-  "ente_promotore": "es. Regione Campania — Agricoltura · CSR Campania 2023-2027 · DRD n. XXX del GG/MM/AAAA",
-  "riferimento_normativo": "es. DRD n. 329 del 04/08/2026 — PSP PAC 2023-2027",
-  "hero_tag": "riga descrittiva breve per l'header (programma, fonte, decreto)",
-  "hero_subtitle": "sottotitolo descrittivo del bando (max 20 parole)",
-  "dotazione": "es. € 5.000.000",
-  "aliquota": "es. 70%",
-  "forma_sostegno": "es. Fondo Perduto / Finanziamento agevolato / Misto",
-  "apertura": "es. 06/08/2026",
-  "scadenza": "es. 12/10/2026",
-  "finalita": "2-3 frasi che descrivono obiettivi e finalità del bando",
-  "beneficiari": ["beneficiario 1", "beneficiario 2", "..."],
-  "requisiti_ammissibilita": ["requisito 1", "requisito 2", "..."],
-  "spesa_minima": "es. € 20.000",
-  "spesa_massima": "es. € 220.000",
-  "anticipo": "es. Fino al 50% previo fideiussione bancaria — oppure N/D se non previsto",
-  "durata_progetto": "es. 12 mesi dalla concessione",
-  "opere_finanziabili": [
-    {{"categoria": "nome categoria", "descrizione": "descrizione interventi ammissibili", "spese": "tipologie di spesa ammissibili"}}
-  ],
-  "spese_non_ammissibili": ["spesa 1", "spesa 2", "..."],
-  "competenza_territoriale": "descrizione dell'ambito territoriale di applicazione",
-  "modalita_presentazione": "come si presenta la domanda, portale, strumenti richiesti",
-  "documentazione_richiesta": ["documento 1", "documento 2", "..."],
-  "scadenze_dettaglio": [
-    {{"label": "Apertura sportello", "value": "data/modalità"}},
-    {{"label": "Chiusura sportello", "value": "data/ora"}},
-    {{"label": "Modalità presentazione", "value": "dettaglio"}},
-    {{"label": "Durata realizzazione", "value": "dettaglio"}}
-  ],
-  "criteri_selezione": [
-    {{"principio": "nome principio", "descrizione": "criterio e punteggi", "punti": 30}}
-  ],
-  "punteggio_minimo": "es. 35 su 100 — oppure N/D se non specificato",
-  "nota_territoriale": "eventuali vantaggi o specificità territoriali rilevanti per il Cilento/Campania",
-  "contatto_nome": "es. Giovanni Padovano",
-  "contatto_email": "es. giovanni.padovano@regione.campania.it",
-  "contatto_tel": "es. 081-7967461",
-  "contatto_ente": "es. Direzione Generale Agricoltura — Settore 207.00.00",
-  "riferimenti_normativi": ["riferimento 1", "riferimento 2", "..."],
-  "portali": ["es. SIAN: sian.agea.gov.it", "es. SIARC: siarc.regione.campania.it"],
-  "note_aggiuntive": "eventuali informazioni importanti non coperte dalle sezioni precedenti — lascia vuoto se non necessario"
-}}
-
-Se un dato non è disponibile nel documento usa "N/D". Per i criteri di selezione con punteggi usa numeri interi.
-
-REGOLE CRITICHE PER IL JSON:
-1. Usa SOLO virgolette doppie standard " per le stringhe, MAI virgolette singole o tipografiche
-2. Negli apostrofi nelle stringhe italiane (es. dell'impresa, l'azienda) usa la versione escaped: dell\\'impresa, l\\'azienda — OPPURE riformula senza apostrofo: "della impresa", "la azienda"
-3. Non usare mai virgolette tipografiche " " ' ' nel JSON
-4. Ogni stringa deve essere su una sola riga — no newline dentro le stringhe
-5. Verifica mentalmente che il JSON sia valido prima di restituirlo"""
+  "ente_promotore": "...",
+  "riferimento_normativo": "...",
+  "hero_tag": "...",
+  "hero_subtitle": "...",
+  "dotazione": "...",
+  "aliquota": "...",
+  "forma_sostegno": "...",
+  "apertura": "...",
+  "scadenza": "...",
+  "finalita": "...",
+  "beneficiari": ["...", "..."],
+  "requisiti_ammissibilita": ["...", "..."],
+  "spesa_minima": "...",
+  "spesa_massima": "...",
+  "anticipo": "...",
+  "durata_progetto": "...",
+  "opere_finanziabili": [{{"categoria": "...", "descrizione": "...", "spese": "..."}}],
+  "spese_non_ammissibili": ["...", "..."],
+  "competenza_territoriale": "...",
+  "modalita_presentazione": "...",
+  "documentazione_richiesta": ["...", "..."],
+  "scadenze_dettaglio": [{{"label": "...", "value": "..."}}],
+  "criteri_selezione": [{{"principio": "...", "descrizione": "...", "punti": 0}}],
+  "punteggio_minimo": "...",
+  "nota_territoriale": "...",
+  "contatto_nome": "...",
+  "contatto_email": "...",
+  "contatto_tel": "...",
+  "contatto_ente": "...",
+  "riferimenti_normativi": ["...", "..."],
+  "portali": ["...", "..."],
+  "note_aggiuntive": "..."
+}}"""
                     })
 
                     risposta = client.messages.create(
                         model="claude-sonnet-4-6",
                         max_tokens=4000,
-                        messages=[{"role": "user", "content": content}]
+                        messages=[
+                            {"role": "user", "content": content},
+                            {"role": "assistant", "content": "{"}
+                        ]
                     )
 
-                    testo_json = risposta.content[0].text.strip()
-                    match = re.search(r'\{.*\}', testo_json, re.DOTALL)
-                    if not match:
-                        raise ValueError("Claude non ha restituito un JSON valido")
-                    json_str = match.group()
-
-                    # Pulizia aggressiva caratteri problematici
+                    # Ricostruisce il JSON completo aggiungendo il { iniziale del prefill
+                    testo_raw = "{" + risposta.content[0].text.strip()
+                    # Pulizia caratteri Unicode problematici
                     import unicodedata
-                    json_clean = unicodedata.normalize("NFKC", json_str)
-                    # Virgolette tipografiche → standard
+                    testo_raw = unicodedata.normalize("NFKC", testo_raw)
                     for old, new in [('\u2018',"'"),('\u2019',"'"),('\u201a',"'"),
                                      ('\u201c','"'),('\u201d','"'),('\u201e','"'),
-                                     ('\u2013','-'),('\u2014','-'),('\u2026','...'),
-                                     ('\u00e2\u0080\u0099',"'"),('\u00e2\u0080\u009c','"'),
-                                     ('\u00e2\u0080\u009d','"')]:
-                        json_clean = json_clean.replace(old, new)
-                    # Rimuovi newline dentro le stringhe JSON
-                    json_clean = re.sub(r'(?<=: ")([^"]*)\n([^"]*)"', r'\1 \2"', json_clean)
+                                     ('\u2013','-'),('\u2014','-'),('\u2026','...')]:
+                        testo_raw = testo_raw.replace(old, new)
 
                     try:
-                        dati = json.loads(json_clean)
+                        dati = json.loads(testo_raw)
                     except json.JSONDecodeError:
-                        # Retry: chiedi a Claude di correggere
+                        # Retry chiedendo a Claude di correggere
                         retry = client.messages.create(
                             model="claude-sonnet-4-6",
                             max_tokens=4000,
                             messages=[{
                                 "role": "user",
-                                "content": f"Questo JSON non è valido a causa di apostrofi o caratteri speciali. Correggilo sostituendo tutti gli apostrofi nelle stringhe con la versione escaped \\' e restituisci SOLO il JSON corretto, niente altro:\n\n{json_clean}"
-                            }]
+                                "content": f"Questo JSON non e valido. Correggilo: sostituisci apostrofi con spazi, rimuovi escape non validi, assicurati che tutte le stringhe siano su una riga. Restituisci SOLO il JSON corretto:\n\n{testo_raw[:3000]}"
+                            }],
                         )
-                        json_retry = re.search(r'\{.*\}', retry.content[0].text.strip(), re.DOTALL)
-                        if not json_retry:
-                            raise ValueError("Impossibile correggere il JSON. Riprova con un PDF diverso.")
-                        dati = json.loads(json_retry.group())
+                        testo_retry = retry.content[0].text.strip()
+                        match_retry = re.search(r'\{.*\}', testo_retry, re.DOTALL)
+                        if not match_retry:
+                            raise ValueError("Impossibile generare JSON valido. Riprova.")
+                        dati = json.loads(match_retry.group())
 
                     # Genera HTML Scheda Tecnica
                     def build_list(items):
